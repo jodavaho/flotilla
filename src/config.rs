@@ -35,7 +35,7 @@ pub fn load_all() -> Config {
         }
     }
 
-    if let Some(api) = contents.section(Some("endpoint".to_owned()))
+    if let Some(api) = contents.section(Some("api".to_owned()))
     {
         if api.contains_key("endpoint")
         {
@@ -47,7 +47,7 @@ pub fn load_all() -> Config {
     {
         retval.endpoint = std::env::var("FLOTILLA_ENDPOINT").unwrap();
     }
-    else if let Some(endpoint) = contents.section(Some("endpoint".to_owned()))
+    else if let Some(endpoint) = contents.section(Some("api".to_owned()))
     {
         if endpoint.contains_key("endpoint")
         {
