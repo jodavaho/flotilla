@@ -1,2 +1,2 @@
 # flotilla
-Frontend for the Highfleete cogitator at https://hfopt.jodavaho.io
+Command-line for the Highfleete cogitator at https://hfopt.jodavaho.io
