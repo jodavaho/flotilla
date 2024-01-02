@@ -108,9 +108,9 @@ impl<'a> Flotilla<'a>{
         {
             let ship_id = ship["id"].to_string();
             let ship_name = ship["shipName"].to_string();
-            let ship_description = ship["description"].to_string();
-            let ship_owner = ship["owner"].to_string();
-            let ship_created = ship["created"].to_string();
+            let _ship_description = ship["description"].to_string();
+            let _ship_owner = ship["owner"].to_string();
+            let _ship_created = ship["created"].to_string();
             let ship_file_name = ship["fileName"].to_string();
             let ship_download_url = ship["downloadUrl"].to_string();
             let ship_public_url = ship["publicUrl"].to_string();
