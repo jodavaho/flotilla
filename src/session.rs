@@ -13,7 +13,7 @@ pub struct Session {
 impl Session{
     pub fn expired(&self) -> bool {
         let now = Utc::now().timestamp();
-        if now > self.expiration_unix {
+        if now >= self.expiration_unix {
             return true;
         }
         return false;
@@ -37,7 +37,7 @@ pub fn load_session() -> Session {
         id_token: String::from(""),
         user_id: String::from(""),
         refresh_token: String::from(""),
-        expiration_unix: Utc::now().timestamp(),
+        expiration_unix: Utc::now().timestamp()-1,
     })
        
 }

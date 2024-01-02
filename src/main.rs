@@ -4,6 +4,11 @@ mod config;
 mod session;
 mod api;
 
+struct Flotilla {
+    config: config::Config,
+    session: session::Session,
+}
+
 fn main() {
     let matches = Command::new("flotilla")
         .version("0.1.0")
@@ -33,11 +38,13 @@ fn main() {
         return;
     }
 
+
     let config = config::load_all();
     eprintln!("Hello, {}", config.username);
     eprintln!("Loading flotilla from {}", config.endpoint);
     eprintln!("config: API endpoint:{}",config.endpoint);
 
-    let _auth_session = api::login(&config).expect("Could not log in");
-    
+    let session = api::login(&config).expect("Could not log in");
+
+    let _app = Flotilla { config, session };
 }
