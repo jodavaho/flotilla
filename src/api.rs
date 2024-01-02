@@ -3,9 +3,9 @@ use crate::session;
 use chrono::Utc;
 
 #[derive(Debug)]
-pub struct Flotilla {
-    pub config: config::Config,
-    pub session: session::Session,
+pub struct Flotilla<'a> {
+    pub config: &'a config::Config,
+    pub session: &'a session::Session,
 }
 
 #[derive(Debug)]
@@ -32,7 +32,7 @@ pub struct Collection {
     pub ship_ids: Vec<String>,
 }
 
-pub fn login(config: &config::Config) -> Result<session::Session, String>
+pub fn login(config: config::Config) -> Result<session::Session, String>
 {
 
     eprintln!("Logging in to {}", config.endpoint);
@@ -43,40 +43,48 @@ pub fn login(config: &config::Config) -> Result<session::Session, String>
         "password": config.password,
     });
 
-    let mut session = session::load_session();
+    let mut session = session::Session::new();
+    session.load_all();
     if session.expired()
     {
         eprintln!("Session expired, logging in");
         let auth_url = format!("{}/user/quick_login", config.endpoint);
-        eprintln!("Auth URL: {}",auth_url);
+        dbg!("Auth URL: {}", &auth_url);
+
         let res = client
             .post(auth_url)
             .header("Content-Type", "application/json")
             .body(json_body.to_string())
             .send();
-
-        eprintln!("Response: {:?}",res);
+        dbg!("Response: {:?}", &res);
 
         if res.is_err()
         {
-            eprintln!("Error: Could not connect to server");
             return Err(res.err().unwrap().to_string());
         };
         let res = res.unwrap();
 
-        eprintln!("Login successful");
         let json: serde_json::Value = serde_json::from_str(&res.text().unwrap()).unwrap();
         session.id_token = json["AuthenticationResult"]["IdToken"].to_string();
         session.user_id = config.username.clone();
         session.refresh_token = json["AuthenticationResult"]["RefreshToken"].to_string();
         session.expiration_unix =
             json["AuthenticationResult"]["ExpiresIn"].as_i64().unwrap()+Utc::now().timestamp();
-        session::save_session(&session);
+        session.save_to_default();
     }
     Ok(session)
 }
 
-impl Flotilla{
+impl<'a> Flotilla<'a>{
+    #[allow(dead_code)]
+    pub fn new(config: &'a config::Config, session: &'a session::Session) -> Self {
+        Self {
+            config: config,
+            session: session,
+        }
+    }
+
+    #[allow(dead_code)]
     pub fn get_user_data(&self) -> Result<(Vec<Ship>, Vec<Collection>), String>
     {
 

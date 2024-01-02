@@ -7,25 +7,38 @@ mod api;
 
 fn verb_ships(matches: clap::ArgMatches)
 {
-    let config = Config::new().load_all().add_matches(matches.clone());
+    let config = Config::new().load_all(&matches);
     eprintln!("Hello, {}", config.username);
     eprintln!("Loading flotilla from {}", config.endpoint);
     eprintln!("config: API endpoint:{}",config.endpoint);
-    let session = api::login(&config).expect("Could not log in");
-    let app = api::Flotilla { config:*config, session:session };
-    let user_data = app.get_user_data().expect("Could not get user data");
-    eprintln!("User data: {:?}", user_data);
+    let session = api::login(config).expect("Could not log in");
+    dbg!("Session: {:?}", session);
+    //let app = api::Flotilla::new(config, session);
+    //let user_data = app.get_user_data().expect("Could not get user data");
+    //eprintln!("User data: {:?}", user_data.0);
 }
 
 fn verb_login(matches: clap::ArgMatches)
 {
-    let config = Config::new().load_all().add_matches(matches.clone());
-    api::login(&config).expect("Could not log in").save_to_default();
-    eprintln!("Hello, {}, login session saved.", config.username);
+    let config = Config::new()
+        .load_all(&matches);
+    api::login(config)
+        .expect("Could not log in")
+        .save_to_default();
 }
 
 fn verb_setup(matches: clap::ArgMatches) {
-    let config = Config::new().add_matches(matches.clone()).save_to_default();
+    if let Ok(config) = Config::new().load_file(){
+        eprintln!("Overwriting existing config file.");
+        let backup = format!("{}.bak", config.location());
+        std::fs::copy(config.location(), backup)
+            .expect("Could not create backup of config file.");
+    }
+    Config::new()
+        .load_env()
+        .add_matches(&matches)
+        .save_to_default()
+        .expect("Could not save config file.");
 }
 
 fn main() {

@@ -11,6 +11,16 @@ pub struct Session {
 }
 
 impl Session{
+
+    pub fn new() -> Session {
+        Session {
+            id_token: String::from(""),
+            user_id: String::from(""),
+            refresh_token: String::from(""),
+            expiration_unix: Utc::now().timestamp()-1,
+        }
+    }
+
     pub fn expired(&self) -> bool {
         let now = Utc::now().timestamp();
         if now >= self.expiration_unix {
@@ -18,7 +28,7 @@ impl Session{
         }
         return false;
     }
-    pub fn load_all(& self) -> &Session {
+    pub fn load_all(& mut self) -> &Self {
         let config_dir = ProjectDirs::from("io", "Jodavaho", "Flotilla").expect("Application Error: Could not load configuration directory. Please file a bug!");
         let config_file = config_dir.config_dir().join("session.json");
 
@@ -45,7 +55,7 @@ impl Session{
         self
     }
 
-    pub fn save_to_default(&self) -> &Session{
+    pub fn save_to_default(&self) -> &Self{
         let config_dir = ProjectDirs::from("io", "Jodavaho", "Flotilla").expect("Application Error: Could not load configuration directory. Please file a bug!");
         let config_file = config_dir.config_dir().join("session.json");
         //make sure the config directory exists
