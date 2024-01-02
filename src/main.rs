@@ -4,11 +4,6 @@ mod config;
 mod session;
 mod api;
 
-struct Flotilla {
-    config: config::Config,
-    session: session::Session,
-}
-
 fn main() {
     let matches = Command::new("flotilla")
         .version("0.1.0")
@@ -46,5 +41,7 @@ fn main() {
 
     let session = api::login(&config).expect("Could not log in");
 
-    let _app = Flotilla { config, session };
+    let app = api::Flotilla { config, session };
+    let user_data = app.get_user_data().expect("Could not get user data");
+    eprintln!("User data: {:?}", user_data);
 }
