@@ -1,30 +1,11 @@
-use clap::{Arg, Command};
 
+mod interface;
 mod config;
 mod session;
 mod api;
 
 fn main() {
-    let matches = Command::new("flotilla")
-        .version("0.1.0")
-        .author("Joshua Vander Hook <hello@Jodavaho.io>")
-        .about("A CLI tool for managing Flotilla projects")
-        .arg(
-            Arg::new("verbose")
-            .required(false)
-            .short('v')
-            .long("verbose")
-            .help("Sets the level of verbosity")
-            .action(clap::ArgAction::SetTrue)
-            )
-        .arg(
-            Arg::new("setup")
-            .required(false)
-            .long("setup")
-            .help("writes new configuration file")
-            .action(clap::ArgAction::SetTrue)
-            )
-        .get_matches_from(std::env::args());
+    let matches = interface::parse_cli();
 
     if matches.get_flag("setup")
     {
