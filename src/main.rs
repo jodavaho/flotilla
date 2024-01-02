@@ -17,7 +17,7 @@ fn verb_ships(matches: clap::ArgMatches)
     let user_data = app.get_user_data().expect("Could not get user data");
     for ship in user_data.0
     {
-        eprintln!("Ship: {}", ship.name);
+        eprintln!("{} {} {} {} {} {}", ship.short_id, ship.name, ship.file_name, ship.downloads, ship.uploaded, ship.download_url);
     }
 }
 

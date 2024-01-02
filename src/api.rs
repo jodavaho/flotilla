@@ -13,14 +13,12 @@ pub struct Ship {
     pub id: String,
     pub name: String,
     pub file_name: String,
-    pub download_url: String,
-    pub description: String,
-    pub owner: String,
-    pub created: String,
     pub public_url: String,
     pub short_id: String,
     pub downloads: u32,
-    pub uploaded_unix: i64,
+    pub uploaded: u64,
+    pub num_collections: u32,
+    pub download_url: String,
 }
 
 #[derive(Debug)]
@@ -35,7 +33,7 @@ pub struct Collection {
 pub fn login(config: &config::Config) -> Result<session::Session, String>
 {
 
-    eprintln!("Logging in to {}", config.endpoint);
+    dbg!("Logging in to {}", &config.endpoint);
     let client = reqwest::blocking::Client::new();
 
     let json_body = serde_json::json!({
@@ -79,8 +77,8 @@ impl<'a> Flotilla<'a>{
     #[allow(dead_code)]
     pub fn new(config: &'a config::Config, session: &'a session::Session) -> Self {
         Self {
-            config: config,
-            session: session,
+            config,
+            session
         }
     }
 
@@ -98,13 +96,12 @@ impl<'a> Flotilla<'a>{
 
         if res.is_err()
         {
-            eprintln!("Error: Could not connect to server");
             return Err(res.err().unwrap().to_string());
         };
         let res = res.unwrap();
 
         let json: serde_json::Value = serde_json::from_str(&res.text().unwrap()).unwrap();
-        eprintln!("User data: {}", json);
+        dbg!("User data: {}", &json);
         let ships = json["ships"].as_array().unwrap();
         let mut ship_list: Vec<Ship> = Vec::new();
         for ship in ships
@@ -119,20 +116,19 @@ impl<'a> Flotilla<'a>{
             let ship_public_url = ship["publicUrl"].to_string();
             let ship_downloads = ship["downloads"].as_u64().unwrap();
             let ship_short_id = ship["shortId"].to_string();
-            let ship_uploaded_unix = ship["uploaded"].as_i64().unwrap();
+            let ship_uploaded_unix = ship["uploaded"].as_u64().unwrap();
+            let ship_num_collections = ship["numCollections"].as_u64().unwrap();
 
             let ship = Ship {
                 id: ship_id,
                 name: ship_name,
-                description: ship_description,
-                owner: ship_owner,
                 file_name: ship_file_name,
-                download_url: ship_download_url,
                 public_url: ship_public_url,
-                created: ship_created,
                 downloads: ship_downloads as u32,
+                download_url: ship_download_url,
                 short_id: ship_short_id,
-                uploaded_unix: ship_uploaded_unix,
+                num_collections: ship_num_collections as u32,
+                uploaded: ship_uploaded_unix,
             };
             ship_list.push(ship);
         }
