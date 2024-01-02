@@ -1,6 +1,7 @@
 
 use directories::ProjectDirs;
 
+#[derive(Debug)]
 pub struct Config {
     pub username: String,
     pub password: String,
