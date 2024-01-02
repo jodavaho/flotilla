@@ -32,7 +32,7 @@ pub struct Collection {
     pub ship_ids: Vec<String>,
 }
 
-pub fn login(config: config::Config) -> Result<session::Session, String>
+pub fn login(config: &config::Config) -> Result<session::Session, String>
 {
 
     eprintln!("Logging in to {}", config.endpoint);
@@ -110,7 +110,7 @@ impl<'a> Flotilla<'a>{
         for ship in ships
         {
             let ship_id = ship["id"].to_string();
-            let ship_name = ship["name"].to_string();
+            let ship_name = ship["shipName"].to_string();
             let ship_description = ship["description"].to_string();
             let ship_owner = ship["owner"].to_string();
             let ship_created = ship["created"].to_string();

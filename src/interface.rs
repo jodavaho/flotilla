@@ -82,7 +82,7 @@ pub fn parse_cli() -> clap::ArgMatches
     Command::new("flotilla")
         .version("0.1.0")
         .author("Joshua Vander Hook <hello@Jodavaho.io>")
-        .about("A CLI tool for managing Flotilla projects")
+        .about("A CLI tool for managing Hfopt projects")
         .subcommand(setup_command)
         .subcommand(login_command)
         .subcommand(logout_command)

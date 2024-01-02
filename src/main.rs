@@ -11,28 +11,41 @@ fn verb_ships(matches: clap::ArgMatches)
     eprintln!("Hello, {}", config.username);
     eprintln!("Loading flotilla from {}", config.endpoint);
     eprintln!("config: API endpoint:{}",config.endpoint);
-    let session = api::login(config).expect("Could not log in");
-    dbg!("Session: {:?}", session);
-    //let app = api::Flotilla::new(config, session);
-    //let user_data = app.get_user_data().expect("Could not get user data");
-    //eprintln!("User data: {:?}", user_data.0);
+    let session = api::login(&config).expect("Could not log in");
+    dbg!("Session: {:?}",&session);
+    let app = api::Flotilla::new(&config, &session);
+    let user_data = app.get_user_data().expect("Could not get user data");
+    for ship in user_data.0
+    {
+        eprintln!("Ship: {}", ship.name);
+    }
 }
 
 fn verb_login(matches: clap::ArgMatches)
 {
     let config = Config::new()
         .load_all(&matches);
-    api::login(config)
+    api::login(&config)
         .expect("Could not log in")
         .save_to_default();
+}
+
+fn verb_logout(_matches: clap::ArgMatches)
+{
+    if let Err(x) = std::fs::remove_file(Config::new().location())
+    {
+        eprintln!("Could not remove config file: {}", x);
+    }
 }
 
 fn verb_setup(matches: clap::ArgMatches) {
     if let Ok(config) = Config::new().load_file(){
         eprintln!("Overwriting existing config file.");
         let backup = format!("{}.bak", config.location());
-        std::fs::copy(config.location(), backup)
-            .expect("Could not create backup of config file.");
+        if let Err(x) = std::fs::copy(config.location(), backup)
+        {
+            eprintln!("Could not create backup of config file: {}", x);
+        }
     }
     Config::new()
         .load_env()
@@ -62,6 +75,9 @@ fn main() {
         },
         "ships" => {
             verb_ships(matches)
+        },
+        "logout" => {
+            verb_logout(matches)
         },
         _ => {
             eprintln!("Unknown verb. Please see --help for more information.");
