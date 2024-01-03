@@ -26,7 +26,7 @@ impl Config {
     }
 
     #[allow(dead_code)]
-    pub fn add_matches(mut self, matches: & clap::ArgMatches) -> Self {
+    pub fn add_matches(mut self, 
         if let Some(username) = matches.get_one::<String>("username") {
             self.username = username.clone();
         }
