@@ -8,7 +8,7 @@ use std::path::PathBuf;
 pub struct Cli {
 
     #[command(subcommand)]
-    pub subcommand: Option<SubCommand>,
+    pub subcommand: SubCommand,
 
     /// Sets a custom config file
     #[arg(short, long, value_name = "FILE")]
