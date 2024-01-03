@@ -58,6 +58,7 @@ pub enum SubCommand
     /// Pre-verify a .seria file before uploading
     Verify
     {
+        /// A .seria file to verify. This will not upload the file, but will ensure that it is valid and ready to upload
         file: PathBuf,
     }
 }

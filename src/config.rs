@@ -1,6 +1,10 @@
 
 use directories::ProjectDirs;
 
+
+
+
+
 #[derive(Debug)]
 pub struct Config {
     pub username: String,
@@ -23,20 +27,6 @@ impl Config {
     pub fn location(&self) -> String {
         let config_dir = ProjectDirs::from("io", "Jodavaho", "Flotilla").expect("Application Error: Could not load configuration directory. Please file a bug!");
         format!("{}/config.ini", config_dir.config_dir().to_str().unwrap())
-    }
-
-    #[allow(dead_code)]
-    pub fn add_matches(mut self, matches: &clap::ArgMatches) -> Self {
-        if let Some(username) = matches.get_one::<String>("username") {
-            self.username = username.clone();
-        }
-        if let Some(password) = matches.get_one::<String>("password") {
-            self.password = password.clone();
-        }
-        if let Some(endpoint) = matches.get_one::<String>("endpoint") {
-            self.endpoint = endpoint.clone();
-        }
-        self
     }
 
     pub fn load_env(mut self) -> Self {
@@ -98,8 +88,32 @@ impl Config {
         Ok(self)
     }
 
-    pub fn load_all(self, matches: &clap::ArgMatches) -> Self {
-        self.load_file().unwrap().load_env().add_matches(&matches)
+    pub fn from_options(mut self, username:Option<String>, password:Option<String>, endpoint:Option<String>) -> Self {
+        if let Some(username) = username
+        {
+            self.username = username.to_owned();
+        }
+        if let Some(password) = password.to_owned()
+        {
+            self.password = password.to_owned();
+        }
+        if let Some(endpoint) = endpoint.to_owned()
+        {
+            self.endpoint = endpoint.to_owned();
+        }
+        self
+    }
+
+    pub fn remove(self) -> Result<Self, String> {
+        match std::fs::remove_file(self.location())
+        {
+            Ok(_) => Ok(self),
+            Err(x) => Err(x.to_string())
+        }
+    }
+
+    pub fn load_all(self, username_override:Option<String>, password_override:Option<String>, endpoint_override:Option<String>) -> Self {
+        self.load_file().unwrap().load_env().from_options(username_override, password_override, endpoint_override)
     }
 
     pub fn save_to_default(&self, ) -> Result<&Config, std::io::Error>{

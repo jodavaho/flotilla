@@ -55,6 +55,16 @@ impl Session{
         self
     }
 
+    pub fn remove(self) -> Result<Self, String> {
+        let config_dir = ProjectDirs::from("io", "Jodavaho", "Flotilla").expect("Application Error: Could not load configuration directory. Please file a bug!");
+        let config_file = config_dir.config_dir().join("session.json");
+        match std::fs::remove_file(&config_file)
+        {
+            Ok(_) => Ok(self),
+            Err(x) => Err(x.to_string()),
+        }
+    }
+
     pub fn save_to_default(&self) -> &Self{
         let config_dir = ProjectDirs::from("io", "Jodavaho", "Flotilla").expect("Application Error: Could not load configuration directory. Please file a bug!");
         let config_file = config_dir.config_dir().join("session.json");
