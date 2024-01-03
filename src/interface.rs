@@ -1,6 +1,7 @@
 // Purpose: Defines the CLI interface for Flotilla
 
 use clap::{Parser,Subcommand};
+use clap::ValueEnum;
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -19,6 +20,7 @@ pub struct Cli {
     pub verbose: Option<bool>,
 
 }
+
 
 #[derive(Subcommand)]
 pub enum SubCommand
@@ -60,6 +62,20 @@ pub enum SubCommand
     {
         /// A .seria file to verify. This will not upload the file, but will ensure that it is valid and ready to upload
         file: PathBuf,
-    }
+    },
+    /// Get a ship or collection by id
+    Get
+    {
+        /// The id of the ship or collection to get
+        id: String,
+    },
+    /// List ships or collections
+    #[command(alias = "ls")]
+    List
+    {
+        /// What to list? Limit to ships or collections, or omit to list both
+        #[clap(name = "what", value_parser = clap::builder::PossibleValuesParser::new(["ships","collections"]))]
+        what: Option<String>,
+    },
 }
 

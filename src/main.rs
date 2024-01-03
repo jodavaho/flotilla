@@ -49,6 +49,11 @@ fn verb_setup(username: Option<String>, password: Option<String>, endpoint: Opti
     eprintln!("Config file saved to {}", cfg.location());
 }
 
+fn verb_verify(file: std::path::PathBuf)
+{
+    eprintln!("Verifying {}", file.display());
+}
+
 
 fn main() 
 {
@@ -58,9 +63,9 @@ fn main()
         Setup{username, password, endpoint} => verb_setup(username, password, endpoint),
         Login{username, password, endpoint} => verb_login(username, password, endpoint),
         Logout => verb_logout(),
-        Verify { file } => {
-            eprintln!("Verifying {}", file.display());
-        },
+        Verify { file } => verb_verify(file),
+        List { what } => eprintln!("List {:?}", what ),
+        Get { id } => eprintln!("Get {}", id),
 
     }
 
