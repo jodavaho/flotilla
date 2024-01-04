@@ -1,3 +1,4 @@
+use crate::config::Config;
 
 pub fn exec(username: Option<String>, password: Option<String>, endpoint: Option<String>) {
     if let Ok(config) = Config::new().load_file(){
