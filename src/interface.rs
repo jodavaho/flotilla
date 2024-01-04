@@ -1,7 +1,6 @@
 // Purpose: Defines the CLI interface for Flotilla
 
 use clap::{Parser,Subcommand};
-use clap::ValueEnum;
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -55,20 +54,26 @@ pub enum SubCommand
         #[arg(short, long, value_name = "ENDPOINT")]
         endpoint: Option<String>,
     },
+
     /// Logs out
-    Logout,
+    Logout
+    {
+    },
+
     /// Pre-verify a .seria file before uploading
     Verify
     {
         /// A .seria file to verify. This will not upload the file, but will ensure that it is valid and ready to upload
         file: PathBuf,
     },
+
     /// Get a ship or collection by id
     Get
     {
         /// The id of the ship or collection to get
         id: String,
     },
+
     /// List ships or collections
     #[command(alias = "ls")]
     List
@@ -77,5 +82,10 @@ pub enum SubCommand
         #[clap(name = "what", value_parser = clap::builder::PossibleValuesParser::new(["ships","collections"]))]
         what: Option<String>,
     },
-}
 
+    /// Fetch latest data from servers (this is often called internally, but you can force it if
+    /// you'd like
+    Fetch
+    {
+    },
+}
