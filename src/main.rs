@@ -4,25 +4,28 @@ mod config;
 mod interface;
 mod session;
 mod verbs;
-use clap::Parser;
 use interface::SubCommand::*;
 use verbs::verify;
 use verbs::setup;
 use verbs::login;
 use verbs::logout;
+use verbs::list;
+use verbs::get;
+use verbs::fetch;
 
 fn main() 
 {
-    let cli = interface::Cli::parse();
+    let cli:interface::Cli = argp::parse_args_or_exit(argp::DEFAULT);
+
     match cli.subcommand
     {
-        Setup  { username, password, endpoint } => setup::exec(username, password, endpoint),
-        Login  { username, password, endpoint } => login::exec(username, password, endpoint),
-        Logout { }  => logout::exec(),
-        Verify { file } => verify::exec(file),
-        List   { what } => eprintln!("List {:?}", what ),
-        Get    { id } => eprintln!("Get {}", id),
-        Fetch  { }  => eprintln!("Fetch"),
+        Verify(options) => verify::exec(options.file),
+        Setup(options) => setup::exec(options.username, options.password, options.endpoint),
+        Login(options) => login::exec(options.username, options.password, options.endpoint),
+        Logout(_) => logout::exec(),
+        Get(options) => get::exec(options.id),
+        List(options) => list::exec(options.what),
+        Fetch(_) => fetch::exec(),
     }
 
 }

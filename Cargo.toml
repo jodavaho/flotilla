@@ -13,8 +13,8 @@ copyright = "Copyright (c) 2023 Joshua Vander Hook"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+argp = "0.3.0"
 chrono = "0.4.31"
-clap = { version = "4.4.12", features = ["derive"] }
 directories = "5.0.1"
 reqwest = { version = "0.11.23", features = ["blocking"] }
 rust-ini = "0.20.0"
