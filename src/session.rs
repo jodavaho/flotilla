@@ -28,7 +28,7 @@ impl Session{
         }
         return false;
     }
-    pub fn load_all(& mut self) -> &Self {
+    pub fn load_all(&self) -> Self {
         let config_dir = ProjectDirs::from("io", "Jodavaho", "Flotilla").expect("Application Error: Could not load configuration directory. Please file a bug!");
         let config_file = config_dir.config_dir().join("session.json");
 
@@ -41,18 +41,19 @@ impl Session{
             }
         };
 
-        let found = serde_json::from_str(&contents).unwrap_or(Session {
-            id_token: String::from(""),
-            user_id: String::from(""),
-            refresh_token: String::from(""),
-            expiration_unix: Utc::now().timestamp()-1,
-        });
+        if let Ok(found) = serde_json::from_str(&contents)
+        {
+            return found;
+        }
 
-        self.id_token = found.id_token;
-        self.user_id = found.user_id;
-        self.refresh_token = found.refresh_token;
-        self.expiration_unix = found.expiration_unix;
-        self
+        Session{
+            id_token: self.id_token.clone(),
+            user_id: self.user_id.clone(),
+            refresh_token: self.refresh_token.clone(),
+            expiration_unix: self.expiration_unix.clone(),
+        }
+
+
     }
 
     pub fn remove(self) -> Result<Self, String> {

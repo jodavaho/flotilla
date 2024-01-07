@@ -9,24 +9,41 @@ pub struct Flotilla<'a> {
 }
 
 #[derive(Debug)]
+#[derive(serde::Serialize, serde::Deserialize)]
+pub struct UserData
+{
+    pub ships: Vec<Ship>,
+    pub collections: Vec<Collection>,
+}
+
+#[derive(Debug)]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct Ship {
     pub id: String,
+    #[serde(rename = "shipName")]
     pub name: String,
+    #[serde(rename = "fileName")]
     pub file_name: String,
-    pub public_url: String,
+    #[serde(rename = "shortId")]
     pub short_id: String,
     pub downloads: u32,
     pub uploaded: u64,
+    #[serde(rename = "numCollections")]
     pub num_collections: u32,
+    #[serde(rename = "downloadUrl")]
     pub download_url: String,
 }
 
 #[derive(Debug)]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct Collection {
     pub id: String,
+    #[serde(rename = "collectionName")]
     pub name: String,
     pub description: String,
+    #[serde(rename = "publicUrl")]
     pub public_url: String,
+    #[serde(rename = "ships")]
     pub ship_ids: Vec<String>,
 }
 
@@ -83,7 +100,7 @@ impl<'a> Flotilla<'a>{
     }
 
     #[allow(dead_code)]
-    pub fn get_user_data(&self) -> Result<(Vec<Ship>, Vec<Collection>), String>
+    pub fn get_user_data(&self) -> Result<UserData, String>
     {
 
         let token_value = format!("Bearer {}",self.session.id_token.replace("\"", ""));
@@ -99,63 +116,9 @@ impl<'a> Flotilla<'a>{
             return Err(res.err().unwrap().to_string());
         };
         let res = res.unwrap();
+        let txt = res.text().unwrap();
+        let data: UserData = serde_json::from_str(&txt).unwrap();
 
-        let json: serde_json::Value = serde_json::from_str(&res.text().unwrap()).unwrap();
-        dbg!("User data: {}", &json);
-        let ships = json["ships"].as_array().unwrap();
-        let mut ship_list: Vec<Ship> = Vec::new();
-        for ship in ships
-        {
-            let ship_id = ship["id"].to_string();
-            let ship_name = ship["shipName"].to_string();
-            let _ship_description = ship["description"].to_string();
-            let _ship_owner = ship["owner"].to_string();
-            let _ship_created = ship["created"].to_string();
-            let ship_file_name = ship["fileName"].to_string();
-            let ship_download_url = ship["downloadUrl"].to_string();
-            let ship_public_url = ship["publicUrl"].to_string();
-            let ship_downloads = ship["downloads"].as_u64().unwrap();
-            let ship_short_id = ship["shortId"].to_string();
-            let ship_uploaded_unix = ship["uploaded"].as_u64().unwrap();
-            let ship_num_collections = ship["numCollections"].as_u64().unwrap();
-
-            let ship = Ship {
-                id: ship_id,
-                name: ship_name,
-                file_name: ship_file_name,
-                public_url: ship_public_url,
-                downloads: ship_downloads as u32,
-                download_url: ship_download_url,
-                short_id: ship_short_id,
-                num_collections: ship_num_collections as u32,
-                uploaded: ship_uploaded_unix,
-            };
-            ship_list.push(ship);
-        }
-        let collections = json["collections"].as_array().unwrap();
-        let mut collection_list: Vec<Collection> = Vec::new();
-        for collection in collections
-        {
-            let collection_id = collection["id"].to_string();
-            let collection_name = collection["collectionName"].to_string();
-            let collection_description = collection["description"].to_string();
-            let collection_ship_ids = collection["ships"].as_array().unwrap();
-            let collection_public_url = collection["publicUrl"].to_string();
-            let mut ship_ids: Vec<String> = Vec::new();
-            for ship_id in collection_ship_ids
-            {
-                let ship_id = ship_id.to_string();
-                ship_ids.push(ship_id);
-            }
-            let collection = Collection {
-                id: collection_id,
-                name: collection_name,
-                description: collection_description,
-                public_url: collection_public_url,
-                ship_ids: ship_ids,
-            };
-            collection_list.push(collection);
-        }
-        Ok((ship_list,collection_list))
+        Ok(data)
     }
 }
