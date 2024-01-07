@@ -26,6 +26,11 @@ fn main()
         Get(options) => get::exec(options.id),
         List(options) => list::exec(options.what),
         Fetch(_) => fetch::exec(),
+        Edit(options) => {
+            dbg!(options);
+            eprintln!("Edit not implemented yet");
+            std::process::exit(1);
+        },
     }
 
 }

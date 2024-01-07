@@ -131,7 +131,7 @@ impl Config {
             .set("username", self.username.clone())
             .set("password", self.password.clone());
 
-        contents.with_section(Some("endpoint".to_owned()))
+        contents.with_section(Some("api".to_owned()))
             .set("endpoint", self.endpoint.clone());
 
         //make sure the config directory exists

@@ -45,18 +45,26 @@ pub struct Collection {
     pub public_url: String,
     #[serde(rename = "ships")]
     pub ship_ids: Vec<String>,
+    pub icon: String,
+    pub color: String,
+    #[serde(rename = "isPublic")]
+    pub is_public: bool,
+    #[serde(rename = "downloadUrl")]
+    pub download_url: String,
 }
 
 pub fn login(config: &config::Config) -> Result<session::Session, String>
 {
 
-    dbg!("Logging in to {}", &config.endpoint);
+    dbg!(&config.endpoint);
     let client = reqwest::blocking::Client::new();
 
     let json_body = serde_json::json!({
         "email": config.username,
         "password": config.password,
     });
+
+    dbg!(&json_body);
 
     let mut session = session::Session::new();
     session.load_all();
@@ -78,8 +86,10 @@ pub fn login(config: &config::Config) -> Result<session::Session, String>
             return Err(res.err().unwrap().to_string());
         };
         let res = res.unwrap();
+        let txt = res.text().unwrap();
+        dbg!(&txt);
 
-        let json: serde_json::Value = serde_json::from_str(&res.text().unwrap()).unwrap();
+        let json: serde_json::Value = serde_json::from_str(&txt).unwrap();
         session.id_token = json["AuthenticationResult"]["IdToken"].to_string();
         session.user_id = config.username.clone();
         session.refresh_token = json["AuthenticationResult"]["RefreshToken"].to_string();
@@ -117,6 +127,7 @@ impl<'a> Flotilla<'a>{
         };
         let res = res.unwrap();
         let txt = res.text().unwrap();
+        dbg!(&txt);
         let data: UserData = serde_json::from_str(&txt).unwrap();
 
         Ok(data)

@@ -33,11 +33,11 @@ pub struct SetupOptions
     pub username: Option<String>,
 
     /// Sets the password
-    #[argp(option, arg_name = "PASSWORD")]
+    #[argp(option, short='p', arg_name = "PASSWORD")]
     pub password: Option<String>,
 
     /// Sets the API endpoint
-    #[argp(option, arg_name = "ENDPOINT")]
+    #[argp(option, short='e', arg_name = "ENDPOINT")]
     pub endpoint: Option<String>,
 }
 
@@ -52,11 +52,11 @@ pub struct LoginOptions
     pub username: Option<String>,
 
     /// Sets the password
-    #[argp(option, arg_name = "PASSWORD")]
+    #[argp(option, short='p', arg_name = "PASSWORD")]
     pub password: Option<String>,
 
     /// Sets the API endpoint
-    #[argp(option, arg_name = "ENDPOINT")]
+    #[argp(option, short='e', arg_name = "ENDPOINT")]
     pub endpoint: Option<String>,
 }
 
@@ -122,6 +122,58 @@ pub struct FetchOptions
 #[derive(FromArgs)]
 #[derive(Debug, PartialEq)]
 #[argp(subcommand)]
+/// Edit a ship or collection by id
+pub enum EditOperation
+{
+    /// Add a key/value pair to a ship or collection
+    Add(EditAddOptions),
+
+    /// Remove a key/value pair from a ship or collection
+    Remove(EditRemoveOptions),
+}
+
+#[derive(FromArgs)]
+#[derive(Debug, PartialEq)]
+#[argp(subcommand, name = "add")]
+/// Add a key/value pair to a ship or collection
+pub struct EditAddOptions
+{
+    #[argp(positional)]
+    /// The key to add
+    pub key: String,
+    #[argp(positional)]
+    /// The value to add
+    pub value: String,
+}
+
+#[derive(FromArgs)]
+#[derive(Debug, PartialEq)]
+#[argp(subcommand, name = "remove")]
+/// Remove a key/value pair from a ship or collection
+pub struct EditRemoveOptions
+{
+    #[argp(positional)]
+    pub key: String,
+}
+
+#[derive(FromArgs)]
+#[derive(Debug, PartialEq)]
+#[argp(subcommand, name = "edit")]
+/// Edit a ship or collection by id
+pub struct EditOptions
+{
+    #[argp(positional)]
+    /// The id of the ship or collection to edit
+    pub id: String,
+
+    /// The operation to perform
+    #[argp(subcommand)]
+    pub operation: EditOperation,
+}
+
+#[derive(FromArgs)]
+#[derive(Debug, PartialEq)]
+#[argp(subcommand)]
 pub enum SubCommand
 {
     /// Writes a new configuration file
@@ -142,4 +194,7 @@ pub enum SubCommand
 
     /// Fetch a ship or collection by id
     Fetch(FetchOptions),
+
+    /// Edit a ship or collection by id
+    Edit(EditOptions),
 }
