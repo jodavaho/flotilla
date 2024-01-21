@@ -130,6 +130,9 @@ pub enum EditOperation
 
     /// Remove a key/value pair from a ship or collection
     Remove(EditRemoveOptions),
+
+    /// Set a key/value pair on a ship or collection
+    Set(EditSetOptions),
 }
 
 #[derive(FromArgs)]
@@ -143,7 +146,21 @@ pub struct EditAddOptions
     pub key: String,
     #[argp(positional)]
     /// The value to add
-    pub value: String,
+    pub values: Vec<String>,
+}
+
+#[derive(FromArgs)]
+#[derive(Debug, PartialEq)]
+#[argp(subcommand, name = "set")]
+/// Add a key/value pair to a ship or collection
+pub struct EditSetOptions
+{
+    #[argp(positional)]
+    /// The key to add
+    pub key: String,
+    #[argp(positional)]
+    /// The value to add (multiple values will be joined with a space)
+    pub values: Vec<String>,
 }
 
 #[derive(FromArgs)]
@@ -153,7 +170,11 @@ pub struct EditAddOptions
 pub struct EditRemoveOptions
 {
     #[argp(positional)]
+    /// The key to remove (or remove *from*)
     pub key: String,
+    #[argp(positional)]
+    /// The value to remove (none will remove all values for the key)
+    pub values: Vec<String>,
 }
 
 #[derive(FromArgs)]

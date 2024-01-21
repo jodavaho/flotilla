@@ -4,6 +4,7 @@ mod config;
 mod interface;
 mod session;
 mod verbs;
+
 use interface::SubCommand::*;
 use verbs::verify;
 use verbs::setup;
@@ -12,6 +13,7 @@ use verbs::logout;
 use verbs::list;
 use verbs::get;
 use verbs::fetch;
+use verbs::edit;
 
 fn main() 
 {
@@ -26,11 +28,7 @@ fn main()
         Get(options) => get::exec(options.id),
         List(options) => list::exec(options.what),
         Fetch(_) => fetch::exec(),
-        Edit(options) => {
-            dbg!(options);
-            eprintln!("Edit not implemented yet");
-            std::process::exit(1);
-        },
+        Edit(options) => edit::exec(options.id, options.operation),
     }
 
 }
