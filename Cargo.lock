@@ -247,6 +247,7 @@ dependencies = [
  "rust-ini",
  "serde",
  "serde_json",
+ "similar",
 ]
 
 [[package]]
@@ -917,6 +918,15 @@ dependencies = [
  "form_urlencoded",
  "itoa",
  "ryu",
+ "serde",
+]
+
+[[package]]
+name = "similar"
+version = "2.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "32fea41aca09ee824cc9724996433064c89f7777e60762749a4170a14abbfa21"
+dependencies = [
  "serde",
 ]
 

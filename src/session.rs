@@ -71,7 +71,6 @@ impl Session{
         let config_file = config_dir.config_dir().join("session.json");
         //make sure the config directory exists
         std::fs::create_dir_all(config_dir.config_dir()).expect("Application Error: Could not create configuration directory. Please file a bug!");
-        println!("Writing to {:?}", config_file);
         let file = std::fs::File::create(&config_file).expect("Failed to create config file");
         serde_json::to_writer_pretty(&file, self).expect("Failed to write config file");
         self

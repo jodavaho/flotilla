@@ -2,7 +2,7 @@ use crate::interface::EditOperation;
 use crate::api;
 use crate::config::Config;
 use crate::session::Session;
-use crate::api::UserData;
+use similar::{ChangeTag, TextDiff};
 use serde_json::json;
 
 enum IdType{
@@ -20,20 +20,19 @@ fn get_id_type(id: &String) -> IdType{
         }
     }
 }
+
+
 pub fn exec(id: String, operation: EditOperation){
-    dbg!(&id);
-    dbg!(&operation);
 
     let config = Config::new().load_env().load_file().expect("Application Error: Could not load configuration file. Please file a bug!");
     let session = Session::new().load_all();
     if session.expired()
     {
-        println!("Session expired. Please login.");
+        eprintln!("Session expired. Please login.");
         return;
     }
 
     let mut user_data = api::Flotilla::new(&config, &session).get_user_data().expect("Application Error: Could not get user data. Please file a bug!");
-    println!("{}", serde_json::to_string_pretty(&user_data).unwrap());
 
     let json_data = match get_id_type(&id)
     {
@@ -81,21 +80,39 @@ pub fn exec(id: String, operation: EditOperation){
         },
     };
 
-    user_data.collections.iter_mut().for_each(|collection| {
-        if collection.id == id
-        {
-            *collection = serde_json::from_value(new_json_data.clone()).unwrap();
-        }
-    });
+    if json_data == new_json_data
+    {
+        println!("No changes made.");
+        return;
+    }
 
-    user_data.ships.iter_mut().for_each(|ship| {
-        if ship.id == id
-        {
-            *ship = serde_json::from_value(new_json_data.clone()).unwrap();
-        }
-    });
 
-    println!("{}", serde_json::to_string_pretty(&user_data).unwrap());
+    println!("{}", TextDiff::from_lines(&serde_json::to_string_pretty(&json_data).unwrap(), &serde_json::to_string_pretty(&new_json_data).unwrap())
+             .unified_diff());
+
+    //ask user to confirm
+    //if yes, send to server
+    //if no, exit
+    println!("Are you sure you want to make these changes? (y/n)");
+    let mut input = String::new();
+    std::io::stdin().read_line(&mut input).expect("Application Error: Could not read input. Please file a bug!");
+    if input.trim() != "y"
+    {
+        println!("Aborting.");
+        return;
+    }
+
+    match get_id_type(&id)
+    {
+        IdType::Collection => {
+            let collection: api::Collection = serde_json::from_value(new_json_data).unwrap();
+            api::Flotilla::new(&config, &session).set_collection(collection).expect("Application Error: Could not set collection. Please file a bug!");
+        },
+        IdType::Ship => {
+            let ship: api::Ship = serde_json::from_value(new_json_data).unwrap();
+            api::Flotilla::new(&config, &session).set_ship(ship).expect("Application Error: Could not set ship. Please file a bug!");
+        },
+    }
 
 }
 

@@ -1,6 +1,7 @@
 use crate::config;
 use crate::session;
 use chrono::Utc;
+use serde_json::json;
 
 #[derive(Debug)]
 pub struct Flotilla<'a> {
@@ -56,7 +57,6 @@ pub struct Collection {
 pub fn login(config: &config::Config) -> Result<session::Session, String>
 {
 
-    dbg!(&config.endpoint);
     let client = reqwest::blocking::Client::new();
 
     let json_body = serde_json::json!({
@@ -64,7 +64,6 @@ pub fn login(config: &config::Config) -> Result<session::Session, String>
         "password": config.password,
     });
 
-    dbg!(&json_body);
 
     let mut session = session::Session::new();
     session.load_all();
@@ -72,14 +71,12 @@ pub fn login(config: &config::Config) -> Result<session::Session, String>
     {
         eprintln!("Session expired, logging in");
         let auth_url = format!("{}/user/quick_login", config.endpoint);
-        dbg!("Auth URL: {}", &auth_url);
 
         let res = client
             .post(auth_url)
             .header("Content-Type", "application/json")
             .body(json_body.to_string())
             .send();
-        dbg!("Response: {:?}", &res);
 
         if res.is_err()
         {
@@ -87,7 +84,6 @@ pub fn login(config: &config::Config) -> Result<session::Session, String>
         };
         let res = res.unwrap();
         let txt = res.text().unwrap();
-        dbg!(&txt);
 
         let json: serde_json::Value = serde_json::from_str(&txt).unwrap();
         session.id_token = json["AuthenticationResult"]["IdToken"].to_string();
@@ -127,9 +123,57 @@ impl<'a> Flotilla<'a>{
         };
         let res = res.unwrap();
         let txt = res.text().unwrap();
-        dbg!(&txt);
         let data: UserData = serde_json::from_str(&txt).unwrap();
 
         Ok(data)
     }
+
+    #[allow(dead_code)]
+    pub fn set_collection(&self, collection: Collection) -> Result<(), String>
+    {
+        let id = collection.id.clone();
+        let collection = json!(collection);
+        let token_value = format!("Bearer {}",self.session.id_token.replace("\"", ""));
+        let client = reqwest::blocking::Client::new();
+        let url = format!("{}/shipyard/collection/{}", self.config.endpoint, id);
+        let res = client
+            .put(url)
+            .header("Authorization", token_value)
+            .body(collection.to_string())
+            .send();
+
+        if res.is_err()
+        {
+            return Err(res.err().unwrap().to_string());
+        }
+        let res = res.unwrap();
+        let txt = res.text().unwrap();
+        Ok(())
+
+    }
+
+    #[allow(dead_code)]
+    pub fn set_ship(&self, ship: Ship) -> Result<(), String>
+    {
+        let id = ship.id.clone();
+        let ship = json!(ship);
+        let token_value = format!("Bearer {}",self.session.id_token.replace("\"", ""));
+        let client = reqwest::blocking::Client::new();
+        let url = format!("{}/shipyard/ship/{}", self.config.endpoint, id);
+        let res = client
+            .put(url)
+            .header("Authorization", token_value)
+            .body(ship.to_string())
+            .send();
+
+        if res.is_err()
+        {
+            return Err(res.err().unwrap().to_string());
+        }
+        let res = res.unwrap();
+        let txt = res.text().unwrap();
+        Ok(())
+
+    }
+
 }
