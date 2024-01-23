@@ -115,17 +115,21 @@ pub fn exec(id: String, operation: EditOperation){
         return;
     }
 
+    eprintln!("Sending changes to server...");
+
     match get_id_type(&id)
     {
         IdType::Collection => {
             let collection: api::Collection = serde_json::from_value(new_json_data).unwrap();
-            api::Flotilla::new(&config, &session).set_collection(collection).expect("Application Error: Could not set collection. Please file a bug!");
+            api::Flotilla::new(&config, &session).set_collection(collection).expect("Application Error: Could not set collection. Please file a bug!")
         },
         IdType::Ship => {
             let ship: api::Ship = serde_json::from_value(new_json_data).unwrap();
-            api::Flotilla::new(&config, &session).set_ship(ship).expect("Application Error: Could not set ship. Please file a bug!");
+            api::Flotilla::new(&config, &session).set_ship(ship).expect("Application Error: Could not set ship. Please file a bug!")
         },
     }
+
+    eprintln!("Changes sent.");
 
 }
 

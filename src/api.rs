@@ -52,6 +52,8 @@ pub struct Collection {
     pub is_public: bool,
     #[serde(rename = "downloadUrl")]
     pub download_url: String,
+    #[serde(rename = "collectionOwner")]
+    pub owner: String,
 }
 
 pub fn login(config: &config::Config) -> Result<session::Session, String>
