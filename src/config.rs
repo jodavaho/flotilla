@@ -1,8 +1,6 @@
 
 use directories::ProjectDirs;
-
-
-
+use directories::UserDirs;
 
 
 #[derive(Debug)]
@@ -10,6 +8,7 @@ pub struct Config {
     pub username: String,
     pub password: String,
     pub endpoint: String,
+    pub download_path: String,
 }
 
 
@@ -21,6 +20,7 @@ impl Config {
             username: String::from(""),
             password: String::from(""),
             endpoint: String::from("https://api.jodavaho.io/hfopt/v2"),
+            download_path: UserDirs::new().unwrap().download_dir().to_str().unwrap().to_string(),
         }
     }
 
@@ -64,6 +64,10 @@ impl Config {
             {
                 self.username = user.get("username").unwrap().to_owned();
                 self.password = user.get("password").unwrap().to_owned();
+            }
+            if user.contains_key("download_path")
+            {
+                self.download_path = user.get("download_path").unwrap().to_owned();
             }
         }
 
@@ -129,7 +133,9 @@ impl Config {
 
         contents.with_section(Some("user".to_owned()))
             .set("username", self.username.clone())
-            .set("password", self.password.clone());
+            .set("password", self.password.clone())
+            .set("download_path", self.download_path.clone());
+            
 
         contents.with_section(Some("api".to_owned()))
             .set("endpoint", self.endpoint.clone());

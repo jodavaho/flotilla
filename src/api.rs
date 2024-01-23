@@ -2,6 +2,11 @@ use crate::config;
 use crate::session;
 use chrono::Utc;
 use serde_json::json;
+use std::fs::File;
+use std::io::Write;
+use std::cmp::min;
+use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
+use futures_util::StreamExt;
 
 #[derive(Debug)]
 pub struct Flotilla<'a> {
@@ -55,6 +60,24 @@ pub struct Collection {
     #[serde(rename = "collectionOwner")]
     pub owner: String,
 }
+
+
+pub enum IdType{
+    Collection,
+    Ship,
+}
+
+pub fn get_id_type(id: &String) -> IdType{
+    match id.len()
+    {
+        32 => IdType::Collection,
+        64 => IdType::Ship,
+        _ => {
+            panic!("Invalid id: {}", id);
+        }
+    }
+}
+
 
 pub fn login(config: &config::Config) -> Result<session::Session, String>
 {
@@ -178,4 +201,144 @@ impl<'a> Flotilla<'a>{
 
     }
 
+    pub fn get_collection(&self, id: &String) -> Result<Collection, String>
+    {
+        let token_value = format!("Bearer {}",self.session.id_token.replace("\"", ""));
+        let client = reqwest::blocking::Client::new();
+        let url = format!("{}/shipyard/collection/{}", self.config.endpoint, id);
+        let res = client
+            .get(url)
+            .header("Authorization", token_value)
+            .send();
+
+        if res.is_err()
+        {
+            return Err(res.err().unwrap().to_string());
+        };
+        let res = res.unwrap();
+        let txt = res.text().unwrap();
+        let data: Collection = serde_json::from_str(&txt).unwrap();
+
+        Ok(data)
+    }
+
+    pub fn get_ship(&self, id: &String) -> Result<Ship, String>
+    {
+        let token_value = format!("Bearer {}",self.session.id_token.replace("\"", ""));
+        let client = reqwest::blocking::Client::new();
+        let url = format!("{}/shipyard/ship/{}", self.config.endpoint, id);
+        let res = client
+            .get(url)
+            .header("Authorization", token_value)
+            .send();
+
+        if res.is_err()
+        {
+            return Err(res.err().unwrap().to_string());
+        };
+        let res = res.unwrap();
+        let txt = res.text().unwrap();
+        let data: Ship = serde_json::from_str(&txt).unwrap();
+
+        Ok(data)
+    }
+
+    pub fn get_public_collection(&self, id: &String) -> Result<Collection, String>
+    {
+        let client = reqwest::blocking::Client::new();
+        let url = format!("{}/shipyard/collection/public/{}", self.config.endpoint, id);
+        let res = client
+            .get(url)
+            .send();
+
+        if res.is_err()
+        {
+            return Err(res.err().unwrap().to_string());
+        };
+        let res = res.unwrap();
+        let txt = res.text().unwrap();
+        let data: Collection = serde_json::from_str(&txt).unwrap();
+
+        Ok(data)
+    }
+
+    /* Download the .zip file of a collection */
+    pub fn download_collections(&self, ids: Vec<String>) -> Result<(), String>
+    {
+       
+        let mut handles = vec![];
+        for id in ids
+        {
+            let meta = match self.get_public_collection(&id)
+            {
+                Ok(meta) => meta,
+                Err(e) => {
+                    eprintln!("Collection {} not found or could not fetch metadata... skipping", id);
+                    continue;
+                }
+            };
+            
+            let path = format!("{}/{}.zip", self.config.download_path, id);
+            let url = format!("{}/shipyard/collection/download/{}", self.config.endpoint, id);
+            let handle = std::thread::spawn(|| {
+                let worker_future = download_worker(&url, &path);
+                let res = futures::executor::block_on( worker_future );
+            });
+            handles.push(handle);
+        }
+        for handle in handles
+        {
+
+        }
+        Ok(())
+    }
+
 }
+pub async fn download_worker(url:&String, path:&String) -> Result<(),String>
+    {
+
+        let client = reqwest::Client::new();
+        let res = client
+            .get(url)
+            .send()
+            .await;
+        //.await;
+
+        if res.is_err()
+        {
+            return Err(res.err().unwrap().to_string());
+        };
+        let res = res.unwrap();
+
+        let total_size = res
+            .content_length()
+            .ok_or(format!("Failed to get content length from '{}'", &url))?;
+
+        // Indicatif setup
+        let pb = ProgressBar::new(total_size);
+        pb.set_style(
+            ProgressStyle::default_bar()
+            .template("{msg}\n{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})")
+            .unwrap()
+            .progress_chars("#>-"));
+        pb.set_message(format!("Downloading {}", url.clone()));
+
+        // download chunks
+        let mut file = File::create(path).or(Err(format!("Failed to create file '{}'", path)))?;
+        let mut downloaded: u64 = 0;
+        let mut stream = res.bytes_stream();
+
+        while let Some(item) = stream.next().await{
+            let chunk = item.or(Err(format!("Error while downloading file")))?;
+            file.write_all(&chunk)
+                .or(Err(format!("Error while writing to file")))?;
+            let new = min(downloaded + (chunk.len() as u64), total_size);
+            downloaded = new;
+            pb.set_position(new);
+        }
+
+        pb.finish_with_message(format!("Downloaded {} to {}", url, path));
+
+
+                Ok(())
+    }

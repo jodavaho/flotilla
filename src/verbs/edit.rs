@@ -1,25 +1,9 @@
 use crate::interface::EditOperation;
-use crate::api;
+use crate::api::{Flotilla, IdType, get_id_type, Ship, Collection};
 use crate::config::Config;
 use crate::session::Session;
 use similar::{TextDiff, ChangeTag};
 use serde_json::json;
-
-enum IdType{
-    Collection,
-    Ship,
-}
-
-fn get_id_type(id: &String) -> IdType{
-    match id.len()
-    {
-        32 => IdType::Collection,
-        64 => IdType::Ship,
-        _ => {
-            panic!("Invalid id: {}", id);
-        }
-    }
-}
 
 
 pub fn exec(id: String, operation: EditOperation){
@@ -32,7 +16,7 @@ pub fn exec(id: String, operation: EditOperation){
         return;
     }
 
-    let user_data = api::Flotilla::new(&config, &session).get_user_data().expect("Application Error: Could not get user data. Please file a bug!");
+    let user_data = Flotilla::new(&config, &session).get_user_data().expect("Application Error: Could not get user data. Please file a bug!");
 
     let json_data = match get_id_type(&id)
     {
@@ -93,7 +77,10 @@ pub fn exec(id: String, operation: EditOperation){
         return;
     }
 
-    for change in TextDiff::from_lines(&serde_json::to_string_pretty(&json_data).unwrap(), &serde_json::to_string_pretty(&new_json_data).unwrap())
+    for change in TextDiff::from_lines(
+            &serde_json::to_string_pretty(&json_data).unwrap(), 
+            &serde_json::to_string_pretty(&new_json_data).unwrap()
+        )
         .iter_all_changes() {
         let sign = match change.tag() {
             ChangeTag::Delete => "-",
@@ -103,13 +90,10 @@ pub fn exec(id: String, operation: EditOperation){
         print!("{}{}", sign, change);
     }
 
-    //ask user to confirm
-    //if yes, send to server
-    //if no, exit
-    println!("Are you sure you want to make these changes? (y/n)");
+    println!("Are you sure you want to make these changes? (type yes to confirm)");
     let mut input = String::new();
     std::io::stdin().read_line(&mut input).expect("Application Error: Could not read input. Please file a bug!");
-    if input.trim() != "y"
+    if input.trim().to_ascii_lowercase() != "yes"
     {
         println!("Aborting.");
         return;
@@ -120,12 +104,12 @@ pub fn exec(id: String, operation: EditOperation){
     match get_id_type(&id)
     {
         IdType::Collection => {
-            let collection: api::Collection = serde_json::from_value(new_json_data).unwrap();
-            api::Flotilla::new(&config, &session).set_collection(collection).expect("Application Error: Could not set collection. Please file a bug!")
+            let collection: Collection = serde_json::from_value(new_json_data).unwrap();
+            Flotilla::new(&config, &session).set_collection(collection).expect("Application Error: Could not set collection. Please file a bug!")
         },
         IdType::Ship => {
-            let ship: api::Ship = serde_json::from_value(new_json_data).unwrap();
-            api::Flotilla::new(&config, &session).set_ship(ship).expect("Application Error: Could not set ship. Please file a bug!")
+            let ship: Ship = serde_json::from_value(new_json_data).unwrap();
+            Flotilla::new(&config, &session).set_ship(ship).expect("Application Error: Could not set ship. Please file a bug!")
         },
     }
 

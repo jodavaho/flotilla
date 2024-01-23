@@ -16,7 +16,11 @@ copyright = "Copyright (c) 2023 Joshua Vander Hook"
 argp = "0.3.0"
 chrono = "0.4.31"
 directories = "5.0.1"
-reqwest = { version = "0.11.23", features = ["blocking"] }
+futures = { version = "0.3.30", features = ["futures-executor"] }
+futures-executor = "0.3.30"
+futures-util = "0.3.30"
+indicatif = "0.17.7"
+reqwest = { version = "0.11.23", features = ["blocking", "stream"] }
 rust-ini = "0.20.0"
 serde = { version = "1.0.193", features = ["derive"] }
 serde_json = "1.0.108"

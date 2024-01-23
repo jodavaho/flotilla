@@ -88,6 +88,10 @@ pub struct GetOptions
     /// The id of the ship or collection to get
     #[argp(positional)]
     pub id: String,
+
+    /// Try the public API endpoint instead of the private one (this will not work for private ships or collections)
+    #[argp(switch, short='p')]
+    pub public: Option<bool>,
 }
 
 fn parse_list_what(s: &str) -> Result<String, String>
@@ -199,12 +203,13 @@ pub enum SubCommand
 {
     /// Writes a new configuration file
     Setup(SetupOptions),
+
     /// Logs in - you must have a valid username and password, visit the Hfopt website to create an account
     Login(LoginOptions),
     /// Logs out
     Logout(LogoutOptions),
 
-    /// Pre-verify a .seria file before uploading
+    /// Pre-verify a .seria file before uploading (not implemented)
     Verify(VerifyOptions),
 
     /// Get a ship or collection by id
