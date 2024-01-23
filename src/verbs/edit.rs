@@ -2,7 +2,7 @@ use crate::interface::EditOperation;
 use crate::api;
 use crate::config::Config;
 use crate::session::Session;
-use similar::{ChangeTag, TextDiff};
+use similar::{TextDiff, ChangeTag};
 use serde_json::json;
 
 enum IdType{
@@ -32,7 +32,7 @@ pub fn exec(id: String, operation: EditOperation){
         return;
     }
 
-    let mut user_data = api::Flotilla::new(&config, &session).get_user_data().expect("Application Error: Could not get user data. Please file a bug!");
+    let user_data = api::Flotilla::new(&config, &session).get_user_data().expect("Application Error: Could not get user data. Please file a bug!");
 
     let json_data = match get_id_type(&id)
     {
@@ -73,7 +73,14 @@ pub fn exec(id: String, operation: EditOperation){
             if json_data[&x.key].is_array()
             {
                 json_data[&x.key] = json!(x.values);
-            } else {
+            } else if json_data[&x.key].is_boolean()
+            {
+                json_data[&x.key] = json!(x.values[0].parse::<bool>().unwrap());
+            } else if json_data[&x.key].is_number()
+            {
+                json_data[&x.key] = json!(x.values[0].parse::<f64>().unwrap());
+            } else 
+            {
                 json_data[&x.key] = json!(x.values[0]);
             }
             json_data
@@ -86,9 +93,15 @@ pub fn exec(id: String, operation: EditOperation){
         return;
     }
 
-
-    println!("{}", TextDiff::from_lines(&serde_json::to_string_pretty(&json_data).unwrap(), &serde_json::to_string_pretty(&new_json_data).unwrap())
-             .unified_diff());
+    for change in TextDiff::from_lines(&serde_json::to_string_pretty(&json_data).unwrap(), &serde_json::to_string_pretty(&new_json_data).unwrap())
+        .iter_all_changes() {
+        let sign = match change.tag() {
+            ChangeTag::Delete => "-",
+            ChangeTag::Insert => "+",
+            ChangeTag::Equal => " ",
+        };
+        print!("{}{}", sign, change);
+    }
 
     //ask user to confirm
     //if yes, send to server

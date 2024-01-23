@@ -147,7 +147,7 @@ impl<'a> Flotilla<'a>{
             return Err(res.err().unwrap().to_string());
         }
         let res = res.unwrap();
-        let txt = res.text().unwrap();
+        let _txt = res.text().unwrap();
         Ok(())
 
     }
@@ -171,7 +171,7 @@ impl<'a> Flotilla<'a>{
             return Err(res.err().unwrap().to_string());
         }
         let res = res.unwrap();
-        let txt = res.text().unwrap();
+        let _txt = res.text().unwrap();
         Ok(())
 
     }
