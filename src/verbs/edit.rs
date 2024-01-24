@@ -6,7 +6,7 @@ use similar::{TextDiff, ChangeTag};
 use serde_json::json;
 
 
-pub fn exec(id: String, operation: EditOperation) -> Result<(), String>{
+pub fn exec(id: String, operation: EditOperation, yes:Option<bool> ) -> Result<(), String>{
 
     let config = Config::new().load_env().load_file().map_err(|e| format!("Application Error: Could not load configuration file. Please file a bug! {}", e))?;
     let session = Session::new().load_all();
@@ -82,13 +82,20 @@ pub fn exec(id: String, operation: EditOperation) -> Result<(), String>{
         print!("{}{}", sign, change);
     }
 
-    println!("Are you sure you want to make these changes? (type yes to confirm)");
-    let mut input = String::new();
-    std::io::stdin().read_line(&mut input).map_err(|e| format!("Application Error: Could not read input. Please file a bug! {}", e))?;
-    if input.trim().to_ascii_lowercase() != "yes"
+    let confirmed = yes.unwrap_or(false);
+
+    if !confirmed
     {
-        println!("Aborting.");
-        return Ok(());
+        println!();
+        println!("Are you sure you want to make these changes? (type yes to confirm)");
+        println!();
+        let mut input = String::new();
+        std::io::stdin().read_line(&mut input).map_err(|e| format!("Application Error: Could not read input. Please file a bug! {}", e))?;
+        if input.trim().to_ascii_lowercase() != "yes"
+        {
+            println!("Aborting.");
+            return Ok(());
+        }
     }
 
     eprintln!("Sending changes to server...");

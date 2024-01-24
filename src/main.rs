@@ -27,7 +27,7 @@ fn main()
         Get(options) => get::exec(options.ids, options.public),
         List(options) => list::exec(options.what),
         Fetch(_) => fetch::exec(),
-        Edit(options) => edit::exec(options.id, options.operation),
+        Edit(options) => edit::exec(options.id, options.operation, options.yes),
     }
     .unwrap_or_else(|e| eprintln!("{}", e));
 

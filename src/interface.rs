@@ -187,6 +187,10 @@ pub struct EditRemoveOptions
 /// Edit a ship or collection by id
 pub struct EditOptions
 {
+
+    #[argp(switch, short='y')]
+    /// Do not prompt for confirmation
+    pub yes: Option<bool>,
     #[argp(positional)]
     /// The id of the ship or collection to edit
     pub id: String,
