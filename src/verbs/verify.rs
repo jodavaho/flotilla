@@ -1,6 +1,6 @@
-pub fn exec(file: std::path::PathBuf)
+pub fn exec(file: std::path::PathBuf) -> Result<(), String>
 {
-    eprintln!("Verifying {}", file.display());
+    Err(format!("Not implemented yet: verify {}", file.display()))
 }
 
 

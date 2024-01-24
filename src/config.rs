@@ -20,7 +20,7 @@ impl Config {
             username: String::from(""),
             password: String::from(""),
             endpoint: String::from("https://api.jodavaho.io/hfopt/v2"),
-            download_path: UserDirs::new().unwrap().download_dir().to_str().unwrap().to_string(),
+            download_path: UserDirs::new().unwrap().download_dir().expect("Cannot set download_dir! Please file a bug.").to_str().unwrap().to_string(),
         }
     }
 

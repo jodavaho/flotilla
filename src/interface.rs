@@ -87,9 +87,9 @@ pub struct GetOptions
 {
     /// The id of the ship or collection to get
     #[argp(positional)]
-    pub id: String,
+    pub ids: Vec<String>,
 
-    /// Try the public API endpoint instead of the private one (this will not work for private ships or collections)
+    /// Try the public API endpoint instead of the private one (this will not work for private ships or collections which you do not own)
     #[argp(switch, short='p')]
     pub public: Option<bool>,
 }

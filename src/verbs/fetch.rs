@@ -1,4 +1,4 @@
-pub fn exec()
+pub fn exec() -> Result<(), String>
 {
-    println!("Fetch");
+    Err(format!("Not implemented yet: fetch"))
 }

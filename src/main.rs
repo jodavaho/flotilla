@@ -17,18 +17,18 @@ use verbs::edit;
 
 fn main() 
 {
-    let cli:interface::Cli = argp::parse_args_or_exit(argp::DEFAULT);
-
-    match cli.subcommand
+    match argp::parse_args_or_exit::<interface::Cli>(argp::DEFAULT)
+        .subcommand
     {
         Verify(options) => verify::exec(options.file),
         Setup(options) => setup::exec(options.username, options.password, options.endpoint),
         Login(options) => login::exec(options.username, options.password, options.endpoint),
         Logout(_) => logout::exec(),
-        Get(options) => get::exec(options.id, options.public),
+        Get(options) => get::exec(options.ids, options.public),
         List(options) => list::exec(options.what),
         Fetch(_) => fetch::exec(),
         Edit(options) => edit::exec(options.id, options.operation),
     }
+    .unwrap_or_else(|e| eprintln!("{}", e));
 
 }

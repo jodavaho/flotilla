@@ -1,16 +1,16 @@
 use crate::config;
 use crate::session::Session;
 
-pub fn exec()
+pub fn exec() -> Result<(), String>
 {
-    match config::Config::new().load_file().expect("Could not load config file").remove()
+    if let Err(x) = config::Config::new().load_file().expect("Could not load config file").remove()
     {
-        Ok(_) => eprintln!("Config removed"),
-        Err(x) => eprintln!("Could not remove config: {}", x),
+        return Err(format!("Could not remove config file: {}", x));
     }
-    match Session::new().remove()
+    if let Err(x) = Session::new().remove()
     {
-        Ok(_) => eprintln!("Sesison removed"),
-        Err(x) => eprintln!("Could not remove session: {}", x),
+        return Err(format!("Could not remove session file: {}", x));
     }
+    eprintln!("Logged out.");
+    Ok(())
 }

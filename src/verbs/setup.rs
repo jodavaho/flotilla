@@ -1,18 +1,21 @@
 use crate::config::Config;
 
-pub fn exec(username: Option<String>, password: Option<String>, endpoint: Option<String>) {
+pub fn exec(username: Option<String>, password: Option<String>, endpoint: Option<String>) -> Result<(), String> {
     if let Ok(config) = Config::new().load_file(){
         eprintln!("Overwriting existing config file.");
         let backup = format!("{}.bak", config.location());
-        if let Err(x) = std::fs::copy(config.location(), backup)
+        match std::fs::copy(config.location(), backup)
         {
-            eprintln!("Could not back up config file: {}", x);
+            Ok(_) => {},
+            Err(x) => return Err(format!("Could not backup config file: {}", x).to_string()),
         }
     }
     let cfg = Config::new().load_env().from_options(username, password, endpoint);
-    if let Err(x) = cfg.save_to_default()
+    match cfg.save_to_default()
     {
-        eprintln!("Could not save config file: {}", x);
+        Ok(_) => {},
+        Err(x) => return Err(format!("Could not save config file: {}", x).to_string()),
     } 
     eprintln!("Config file saved to {}", cfg.location());
+    Ok(())
 }

@@ -22,6 +22,11 @@ pub struct UserData
     pub collections: Vec<Collection>,
 }
 
+trait HasId
+{
+    fn get_id(&self) -> String;
+}
+
 #[derive(Debug)]
 #[derive(serde::Serialize, serde::Deserialize)]
 pub struct Ship {
@@ -38,6 +43,13 @@ pub struct Ship {
     pub num_collections: u32,
     #[serde(rename = "downloadUrl")]
     pub download_url: String,
+}
+impl HasId for Ship
+{
+    fn get_id(&self) -> String
+    {
+        self.id.clone()
+    }
 }
 
 #[derive(Debug)]
@@ -59,6 +71,13 @@ pub struct Collection {
     pub download_url: String,
     #[serde(rename = "collectionOwner")]
     pub owner: String,
+}
+impl HasId for Collection
+{
+    fn get_id(&self) -> String
+    {
+        self.id.clone()
+    }
 }
 
 
@@ -129,6 +148,20 @@ impl<'a> Flotilla<'a>{
             session
         }
     }
+   
+
+
+    pub fn get_json_by_id(&self, id: &String)  -> Result<serde_json::Value, String>{
+        match get_id_type(id)
+        {
+            IdType::Collection => {
+                self.get_collection(id).map_err(|e| e.to_string()).map(|c| json!(c))
+            },
+            IdType::Ship => {
+                self.get_ship(id).map_err(|e| e.to_string()).map(|s| json!(s))
+            }
+        }
+    }
 
     #[allow(dead_code)]
     pub fn get_user_data(&self) -> Result<UserData, String>
@@ -175,6 +208,16 @@ impl<'a> Flotilla<'a>{
         let _txt = res.text().unwrap();
         Ok(())
 
+    }
+
+    #[allow(dead_code)]
+    pub fn set_by_id(&self, id: &String, json: serde_json::Value) -> Result<(), String>
+    {
+        return match get_id_type(id)
+        {
+            IdType::Collection => self.set_collection( serde_json::from_value(json).unwrap()),
+            IdType::Ship => self.set_ship( serde_json::from_value(json).unwrap()),
+        }
     }
 
     #[allow(dead_code)]
@@ -265,36 +308,51 @@ impl<'a> Flotilla<'a>{
     /* Download the .zip file of a collection */
     pub fn download_collections(&self, ids: Vec<String>) -> Result<(), String>
     {
-       
+        let multi = MultiProgress::new();
         let mut handles = vec![];
         for id in ids
         {
             let meta = match self.get_public_collection(&id)
             {
                 Ok(meta) => meta,
-                Err(e) => {
+                Err(_) => {
                     eprintln!("Collection {} not found or could not fetch metadata... skipping", id);
                     continue;
                 }
             };
             
-            let path = format!("{}/{}.zip", self.config.download_path, id);
+            let path = format!("{}/{}.zip", self.config.download_path, meta.name);
             let url = format!("{}/shipyard/collection/download/{}", self.config.endpoint, id);
-            let handle = std::thread::spawn(|| {
-                let worker_future = download_worker(&url, &path);
+            // Indicatif setup
+            let pb = ProgressBar::new(100);
+            let pb = multi.add(pb);
+            // TODO since we already use tokio, just make this a tokio spawn.
+            let handle = std::thread::spawn(move|| {
+                let worker_future = download_worker(&url, &path, &pb);
                 let res = futures::executor::block_on( worker_future );
+                if res.is_err()
+                {
+                    eprintln!("Failed to download collection {} : {}", id, res.err().unwrap());
+                }
+                else
+                {
+                    eprintln!("Downloaded collection {}", id);
+                }
             });
             handles.push(handle);
         }
         for handle in handles
         {
-
+            handle.join().unwrap();
         }
+        multi.clear().unwrap();
         Ok(())
     }
 
 }
-pub async fn download_worker(url:&String, path:&String) -> Result<(),String>
+
+#[allow(dead_code)]
+pub async fn download_worker(url:&String, path:&String, pb: &ProgressBar ) -> Result<(),String>
     {
 
         let client = reqwest::Client::new();
@@ -314,8 +372,6 @@ pub async fn download_worker(url:&String, path:&String) -> Result<(),String>
             .content_length()
             .ok_or(format!("Failed to get content length from '{}'", &url))?;
 
-        // Indicatif setup
-        let pb = ProgressBar::new(total_size);
         pb.set_style(
             ProgressStyle::default_bar()
             .template("{msg}\n{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})")
@@ -334,11 +390,10 @@ pub async fn download_worker(url:&String, path:&String) -> Result<(),String>
                 .or(Err(format!("Error while writing to file")))?;
             let new = min(downloaded + (chunk.len() as u64), total_size);
             downloaded = new;
-            pb.set_position(new);
+            let pct : f64 = new as f64 / total_size as f64;
+            pb.set_position( (pct*100.0) as u64);
         }
 
         pb.finish_with_message(format!("Downloaded {} to {}", url, path));
-
-
-                Ok(())
+        Ok(())
     }

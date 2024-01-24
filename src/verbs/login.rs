@@ -1,13 +1,18 @@
 use crate::config::Config;
 use crate::api;
-pub fn exec(username: Option<String>, password: Option<String>, endpoint: Option<String>)
+pub fn exec(username: Option<String>, password: Option<String>, endpoint: Option<String>) -> Result<(), String> 
 {
 
     let config = Config::new().load_all(username, password, endpoint);
-    let sess = api::login(&config)
-        .expect("Could not log in")
-        .save_to_default().expiration_unix;
-    println!("Logged in until {}", 
-             chrono::NaiveDateTime::from_timestamp_opt(sess, 0).unwrap().to_string());
+    match api::login(&config) {
+        Ok(sess) => {
+            println!("Logged in until {}", 
+                     chrono::NaiveDateTime::from_timestamp_opt(sess.expiration_unix, 0).unwrap().to_string());
+            Ok(())
+        },
+        Err(e) => {
+            Err(format!("Could not log in: {}", e))
+        }
+    }
 }
 
