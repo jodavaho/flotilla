@@ -17,8 +17,7 @@ use verbs::edit;
 
 fn main() 
 {
-    match argp::parse_args_or_exit::<interface::Cli>(argp::DEFAULT)
-        .subcommand
+    match argp::parse_args_or_exit::<interface::Cli>(argp::DEFAULT).subcommand
     {
         Verify(options) => verify::exec(options.file),
         Setup(options) => setup::exec(options.username, options.password, options.endpoint),

@@ -2,11 +2,6 @@ use crate::config;
 use crate::session;
 use chrono::Utc;
 use serde_json::json;
-use std::fs::File;
-use std::io::Write;
-use std::cmp::min;
-use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
-use futures_util::StreamExt;
 
 #[derive(Debug)]
 pub struct Flotilla<'a> {
@@ -286,6 +281,7 @@ impl<'a> Flotilla<'a>{
         Ok(data)
     }
 
+    #[allow(dead_code)]
     pub fn get_public_collection(&self, id: &String) -> Result<Collection, String>
     {
         let client = reqwest::blocking::Client::new();
@@ -305,95 +301,6 @@ impl<'a> Flotilla<'a>{
         Ok(data)
     }
 
-    /* Download the .zip file of a collection */
-    pub fn download_collections(&self, ids: Vec<String>) -> Result<(), String>
-    {
-        let multi = MultiProgress::new();
-        let mut handles = vec![];
-        for id in ids
-        {
-            let meta = match self.get_public_collection(&id)
-            {
-                Ok(meta) => meta,
-                Err(_) => {
-                    eprintln!("Collection {} not found or could not fetch metadata... skipping", id);
-                    continue;
-                }
-            };
-            
-            let path = format!("{}/{}.zip", self.config.download_path, meta.name);
-            let url = format!("{}/shipyard/collection/download/{}", self.config.endpoint, id);
-            // Indicatif setup
-            let pb = ProgressBar::new(100);
-            let pb = multi.add(pb);
-            // TODO since we already use tokio, just make this a tokio spawn.
-            let handle = std::thread::spawn(move|| {
-                let worker_future = download_worker(&url, &path, &pb);
-                let res = futures::executor::block_on( worker_future );
-                if res.is_err()
-                {
-                    eprintln!("Failed to download collection {} : {}", id, res.err().unwrap());
-                }
-                else
-                {
-                    eprintln!("Downloaded collection {}", id);
-                }
-            });
-            handles.push(handle);
-        }
-        for handle in handles
-        {
-            handle.join().unwrap();
-        }
-        multi.clear().unwrap();
-        Ok(())
-    }
 
 }
 
-#[allow(dead_code)]
-pub async fn download_worker(url:&String, path:&String, pb: &ProgressBar ) -> Result<(),String>
-    {
-
-        let client = reqwest::Client::new();
-        let res = client
-            .get(url)
-            .send()
-            .await;
-        //.await;
-
-        if res.is_err()
-        {
-            return Err(res.err().unwrap().to_string());
-        };
-        let res = res.unwrap();
-
-        let total_size = res
-            .content_length()
-            .ok_or(format!("Failed to get content length from '{}'", &url))?;
-
-        pb.set_style(
-            ProgressStyle::default_bar()
-            .template("{msg}\n{spinner:.green} [{elapsed_precise}] [{wide_bar:.cyan/blue}] {bytes}/{total_bytes} ({bytes_per_sec}, {eta})")
-            .unwrap()
-            .progress_chars("#>-"));
-        pb.set_message(format!("Downloading {}", url.clone()));
-
-        // download chunks
-        let mut file = File::create(path).or(Err(format!("Failed to create file '{}'", path)))?;
-        let mut downloaded: u64 = 0;
-        let mut stream = res.bytes_stream();
-
-        while let Some(item) = stream.next().await{
-            let chunk = item.or(Err(format!("Error while downloading file")))?;
-            file.write_all(&chunk)
-                .or(Err(format!("Error while writing to file")))?;
-            let new = min(downloaded + (chunk.len() as u64), total_size);
-            downloaded = new;
-            let pct : f64 = new as f64 / total_size as f64;
-            pb.set_position( (pct*100.0) as u64);
-        }
-
-        pb.finish_with_message(format!("Downloaded {} to {}", url, path));
-        Ok(())
-    }
