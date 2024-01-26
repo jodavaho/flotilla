@@ -4,7 +4,7 @@ use crate::session;
 use futures::{stream,StreamExt};
 use reqwest::Client;
 use std::sync::{Arc, Mutex};
-//use indicatif::{ProgressBar, ProgressStyle};
+use indicatif::{ProgressBar, ProgressStyle};
 use indicatif::MultiProgress;
 use tokio::io::AsyncWriteExt;
 use std::collections::HashMap;
@@ -18,17 +18,18 @@ pub fn exec(ids: Vec<String>, public: Option<bool>) -> Result<(), String>
         Some(false)|None => {
             let config = config::Config::new().load_all(None,None,None);
             let session = session::Session::new().load_all();
-            let _multi = Arc::new(Mutex::new(MultiProgress::new()));
+            let multi = MultiProgress::new();
             let flt = api::Flotilla::new(&config, &session);
             tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
                 .build()
-                .unwrap().block_on( download_all(&flt, ids) )
+                .unwrap().block_on( download_all(&flt, ids, Some(multi)) )
         }
 
     }
 }
 
+#[derive(Debug, Clone)]
 struct DownloadTask {
     id: String,
     name: String,
@@ -39,25 +40,8 @@ struct DownloadTask {
     size: u64,
     client: Client,
     token_value: String,
-    data: Option<serde_json::Value>,
 }
 
-impl Clone for DownloadTask {
-    fn clone(&self) -> Self {
-        DownloadTask {
-            id: self.id.clone(),
-            name: self.name.clone(),
-            folder_path: self.folder_path.clone(),
-            dl_dest: self.dl_dest.clone(),
-            meta_url: self.meta_url.clone(),
-            dl_url: self.dl_url.clone(),
-            size: self.size.clone(),
-            client: self.client.clone(),
-            token_value: self.token_value.clone(),
-            data: self.data.clone(),
-        }
-    }
-}
 impl DownloadTask
 {
     fn new(id: String, folder_path: String, meta_url: String, dl_url:String, client: Client, token_value: String) -> DownloadTask
@@ -72,7 +56,6 @@ impl DownloadTask
             size: 0,
             client,
             token_value,
-            data: None,
         }
     }
 
@@ -146,9 +129,10 @@ impl DownloadTask
         Ok( self.clone() )
     }
 }
-pub async fn download_all<'a>(flt: &api::Flotilla<'a>, ids: Vec<String>) -> Result<(), String>
+pub async fn download_all<'a>(flt: &api::Flotilla<'a>, ids: Vec<String>, multi: Option<MultiProgress>) -> Result<(), String>
 {
 
+    
     let token_value = format!("Bearer {}",flt.session.id_token.replace("\"", ""));
     let client = Client::new();
 
@@ -172,47 +156,66 @@ pub async fn download_all<'a>(flt: &api::Flotilla<'a>, ids: Vec<String>) -> Resu
         ), ]
     }).collect::<Vec<DownloadTask>>();
 
-    let collecs = HashMap::<String, Result<(),String>>::new();
 
+    let collecs = HashMap::<String, Result<String,String>>::new();
     let collmut = Arc::new(Mutex::new(collecs));
-    let tasks_and_coll = tasks.into_iter().map(|x| (x, collmut.clone())).collect::<Vec<(DownloadTask, Arc<Mutex<HashMap<String, Result<(),String>>>>)>>();
+
+    let pbs = HashMap::<String, ProgressBar>::new();
+    let pbmut = Arc::new(Mutex::new(pbs));
+
+    for task in tasks.iter() {
+        let pb = multi.clone().unwrap().add(ProgressBar::new(3));
+        pbmut.lock().unwrap().insert(task.id.clone(), pb.clone());
+    }
 
     //Get metadata for all collections
-    stream::iter(tasks_and_coll)
-        .for_each_concurrent(10, 
-                             |(mut task, c)| 
-                             async move {
+    stream::iter(tasks)
+        .for_each_concurrent(10, |mut task|
+                             {
                                  let id = task.id.clone();
-                                 match task.get_metadata().await
-                                 {
-                                     Ok(_) => {
-                                         match task.dl().await
-                                         {
-                                             Ok(t) => {
-                                                 println!("{} - ( {} ) Downloaded to {}", t.id, t.name, t.dl_dest);
-                                                 c.lock().unwrap().insert(id.clone(), Ok(()));
-                                             },
-                                             Err(e) => {
-                                                 c.lock().unwrap().insert(id.clone(), Err(e.to_string()));
-                                                 return;
+                                 let pb = pbmut.lock().unwrap().get(task.id.as_str()).unwrap().clone();
+                                 let c = Arc::clone(&collmut);
+                                 async move {
+                                     match task.get_metadata().await
+                                     {
+                                         Ok(_) => {
+                                             pb.inc(1);
+                                             match task.dl().await
+                                             {
+                                                 Ok(t) => {
+                                                     pb.inc(1);
+                                                     let ok_msg = format!("{} - ( {} ) Downloaded to {}", t.id, t.name, t.dl_dest);
+                                                     c.lock().unwrap().insert(id.clone(), Ok(ok_msg.clone()));
+                                                 },
+                                                 Err(e) => {
+                                                     pb.inc(1);
+                                                     c.lock().unwrap().insert(id.clone(), Err(e.to_string()));
+                                                     return;
+                                                 }
                                              }
+                                         },
+                                         Err(e) => {
+                                             pb.inc(1);
+                                             c.lock().unwrap().insert(id.clone(), Err(e.to_string()));
+                                             return;
                                          }
-                                     },
-                                     Err(e) => {
-                                         c.lock().unwrap().insert(id.clone(), Err(e.to_string()));
-                                         return;
                                      }
-                                 }
-                             }).await;
+                                 }}).await;
 
-    let coll = collmut.lock().unwrap();
+
     let mut errs = vec![];
-    for (k,v) in coll.iter() {
-        match v {
-            Ok(_) => {},
+    for id in ids.iter(){
+        let k = id.clone();
+        let r = collmut.lock().unwrap().get(k.as_str()).unwrap().clone();
+        let pb = pbmut.lock().unwrap().get(k.as_str()).unwrap().clone();
+        match r {
+            Ok(s) => {
+                pb.finish_with_message(s.clone());
+            },
             Err(e) => {
-                errs.push(format!("{} - {}", k, e));
-            }
+                pb.finish_with_message(e.clone());
+                errs.push(e.clone());
+            },
         }
     }
     if errs.len() > 0 {
