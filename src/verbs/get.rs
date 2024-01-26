@@ -3,11 +3,11 @@ use crate::config;
 use crate::session;
 use futures::{stream,StreamExt};
 use reqwest::Client;
-use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 //use indicatif::{ProgressBar, ProgressStyle};
 use indicatif::MultiProgress;
-//use std::fs::File;
+use tokio::io::AsyncWriteExt;
+use std::collections::HashMap;
 
 pub fn exec(ids: Vec<String>, public: Option<bool>) -> Result<(), String>
 {
@@ -18,97 +18,208 @@ pub fn exec(ids: Vec<String>, public: Option<bool>) -> Result<(), String>
         Some(false)|None => {
             let config = config::Config::new().load_all(None,None,None);
             let session = session::Session::new().load_all();
-            let multi = Arc::new(Mutex::new(MultiProgress::new()));
+            let _multi = Arc::new(Mutex::new(MultiProgress::new()));
             let flt = api::Flotilla::new(&config, &session);
-            let _ = tokio::runtime::Builder::new_multi_thread()
+            tokio::runtime::Builder::new_multi_thread()
                 .enable_all()
                 .build()
-                .unwrap().block_on( download_all(&flt, ids, multi.clone()) ).unwrap();
-            Ok(())
+                .unwrap().block_on( download_all(&flt, ids) )
         }
 
     }
 }
 
-pub async fn download_all<'a>(flt: &api::Flotilla<'a>, ids: Vec<String>, _multi: Arc<Mutex<MultiProgress>>) -> Result<(), String>
+struct DownloadTask {
+    id: String,
+    name: String,
+    folder_path: String,
+    dl_dest: String,
+    meta_url: String,
+    dl_url: String,
+    size: u64,
+    client: Client,
+    token_value: String,
+    data: Option<serde_json::Value>,
+}
+
+impl Clone for DownloadTask {
+    fn clone(&self) -> Self {
+        DownloadTask {
+            id: self.id.clone(),
+            name: self.name.clone(),
+            folder_path: self.folder_path.clone(),
+            dl_dest: self.dl_dest.clone(),
+            meta_url: self.meta_url.clone(),
+            dl_url: self.dl_url.clone(),
+            size: self.size.clone(),
+            client: self.client.clone(),
+            token_value: self.token_value.clone(),
+            data: self.data.clone(),
+        }
+    }
+}
+impl DownloadTask
+{
+    fn new(id: String, folder_path: String, meta_url: String, dl_url:String, client: Client, token_value: String) -> DownloadTask
+    {
+        DownloadTask {
+            id,
+            name: "".to_string(),
+            folder_path,
+            dl_dest: "".to_string(),
+            meta_url,
+            dl_url,
+            size: 0,
+            client,
+            token_value,
+            data: None,
+        }
+    }
+
+    async fn get_metadata(&mut self) -> Result<DownloadTask, String>
+    {
+        let resp = self.client
+            .get(&self.meta_url)
+            .header("Authorization", &self.token_value)
+            .send().await;
+        if resp.is_err() {
+            return Err(format!("Library error fetching metadata for {} from {} ... Sorry!", self.id, self.meta_url));
+        }
+        let resst = resp.unwrap().error_for_status();
+        let bytes = match resst {
+            Ok(s) => s.bytes().await,
+            Err(e) => {
+                return Err(format!("Error fetching metadata for {} - is it public or are you logged in? {}", self.id, e.without_url()));
+            }
+        };
+        let v= serde_json::from_slice::<serde_json::Value>(&bytes.unwrap()).unwrap();
+        if v["collectionName"].is_null() || v["id"].is_null() {
+            return Err(format!("Error fetching metadata, bad server response for {}", self.id));
+        }
+        self.name = v["collectionName"].as_str().unwrap().to_string();
+        self.dl_dest = format!("{}/{}-{}.zip", self.folder_path, self.name, self.id[0..8].to_string());
+        Ok(self.clone())
+    }
+
+    async fn dl(&mut self) -> Result<DownloadTask, String>
+    {
+        let resp = self.client
+            .get(&self.dl_url)
+            .header("Authorization", &self.token_value)
+            .send().await;
+        if resp.is_err() {
+            return Err(format!("Library error while downloading {} aka {} ... Sorry! ", self.id, self.name));
+        }
+        let resst = resp.unwrap().error_for_status();
+        let resp = match resst {
+            Ok(x) => x,
+            Err(e) => {
+                match e.status().unwrap().as_u16() {
+                    401 => {
+                        return Err(format!("Implementation erorr while downloading {} aka {} - you might have an old version? {}", self.id, self.name, e.without_url()));
+                    },
+                    404 => {
+                        return Err(format!("Error downloading {} aka {} - is it public or are you logged in? {}", self.id, self.name, e.without_url()));
+                    },
+                    500 => {
+                        return Err(format!("Server error while downloading {} aka {} - Possibly a bug! {}", self.id, self.name, e.without_url()));
+                    },
+                    _ => {
+                        return Err(format!("Other error while downloading {} aka {} - {}", self.id, self.name, e.without_url()));
+                    }
+                }
+            }
+        };
+        self.size = resp.content_length().unwrap();
+        let mut file = tokio::fs::File::create(&self.dl_dest).await.map_err(|e| e.to_string()).map_err(|e| e.to_string()).unwrap();
+        let mut stream = resp.bytes_stream();
+        while let Some(item) = stream.next().await {
+            let bytes = item.unwrap();
+            match file.write_all(&bytes).await.map_err(|e| e.to_string()) {
+                Ok(_) => {},
+                Err(e) => {
+                    return Err(format!("Error writing to file {} - {}", self.dl_dest, e));
+                }
+            }
+        }
+        file.sync_all().await.map_err(|e| e.to_string()).map_err(|e| e.to_string())?;
+        Ok( self.clone() )
+    }
+}
+pub async fn download_all<'a>(flt: &api::Flotilla<'a>, ids: Vec<String>) -> Result<(), String>
 {
 
     let token_value = format!("Bearer {}",flt.session.id_token.replace("\"", ""));
     let client = Client::new();
-    let collections = HashMap::<String,api::Collection>::new();
 
-    let public_urls = ids.iter().map(|x| {
-        format!("{}/shipyard/collection/public/{}", flt.config.endpoint, x)
-    }).collect::<Vec<String>>();
+    let tasks = ids.iter().flat_map(|x| {
+        vec![
+        DownloadTask::new(
+            x.to_string(),
+            flt.config.download_path.clone(),
+            format!("{}/shipyard/collection/public/{}", flt.config.endpoint, x),
+            format!("{}/shipyard/collection/download/{}", flt.config.endpoint, x),
+            client.clone(),
+            token_value.clone(),
+        ),
+        DownloadTask::new(
+            x.to_string(),
+            flt.config.download_path.clone(),
+            format!("{}/shipyard/collection/{}", flt.config.endpoint, x),
+            format!("{}/shipyard/collection/download/{}", flt.config.endpoint, x),
+            client.clone(),
+            token_value.clone(),
+        ), ]
+    }).collect::<Vec<DownloadTask>>();
 
-    let private_urls = ids.iter().map(|x| {
-        format!("{}/shipyard/collection/{}", flt.config.endpoint, x)
-    }).collect::<Vec<String>>();
+    let collecs = HashMap::<String, Result<(),String>>::new();
 
-    let maybe_text = stream::iter(public_urls).chain(stream::iter(private_urls))
-        .map(|url|
-             {
-                 let client = &client;
-                 let token_value = &token_value;
-                 async move {
-                     //eprintln!("Fetching {}", url);
-                     let resp = client
-                         .get(&url)
-                         .header("Authorization", token_value.clone())
-                         .send().await;
-                     resp?.bytes().await
-                 }
-             })
-    .buffer_unordered(10);
+    let collmut = Arc::new(Mutex::new(collecs));
+    let tasks_and_coll = tasks.into_iter().map(|x| (x, collmut.clone())).collect::<Vec<(DownloadTask, Arc<Mutex<HashMap<String, Result<(),String>>>>)>>();
 
-    let coll_lock = Arc::new(Mutex::new(collections));
+    //Get metadata for all collections
+    stream::iter(tasks_and_coll)
+        .for_each_concurrent(10, 
+                             |(mut task, c)| 
+                             async move {
+                                 let id = task.id.clone();
+                                 match task.get_metadata().await
+                                 {
+                                     Ok(_) => {
+                                         match task.dl().await
+                                         {
+                                             Ok(t) => {
+                                                 println!("{} - ( {} ) Downloaded to {}", t.id, t.name, t.dl_dest);
+                                                 c.lock().unwrap().insert(id.clone(), Ok(()));
+                                             },
+                                             Err(e) => {
+                                                 c.lock().unwrap().insert(id.clone(), Err(e.to_string()));
+                                                 return;
+                                             }
+                                         }
+                                     },
+                                     Err(e) => {
+                                         c.lock().unwrap().insert(id.clone(), Err(e.to_string()));
+                                         return;
+                                     }
+                                 }
+                             }).await;
 
-    eprintln!("Downloading {} collections", ids.len());
-
-    maybe_text.for_each_concurrent(10, |b| async {
-        match b
-        {
-            Ok(bytes) => {
-                //eprintln!("Got {} bytes as {}", bytes.len(), String::from_utf8_lossy(&bytes));
-                if let Ok(collection) = serde_json::from_slice::<api::Collection>(&bytes)
-                {
-                    let mut coll = coll_lock.lock().unwrap();
-                    coll.insert(collection.id.clone(), collection);
-                }
-            },
-            Err(x) => {
-                eprintln!("Error: {}", x);
-            }
-        }
-    }).await;
-
-    for id in ids
-    {
-        match coll_lock.lock().unwrap().get(&id)
-        {
-            Some(c) => {
-                let path = format!("{}/{}-{}.zip", flt.config.download_path, c.name,c.id[0..8].to_string());
-                let url = format!("{}/shipyard/collection/download/{}", flt.config.endpoint, id);
-                eprintln!("Downloading {} to {}", url, path);
-                //let pb = ProgressBar::new(100);
-                //let pb = multi.lock().unwrap().add(pb);
-                /*
-                match download_worker(&url, &path, &pb, &client).await
-                {
-                    Ok(_) => {
-                        pb.finish_with_message(format!("Downloaded {}", c.name));
-                    },
-                    Err(e) => {
-                        pb.finish_with_message(format!("Error: {}", e));
-                    }
-                }*/
-            },
-            None => {
-                eprintln!("Collection {} not found or could not fetch metadata... skipping", id);
+    let coll = collmut.lock().unwrap();
+    let mut errs = vec![];
+    for (k,v) in coll.iter() {
+        match v {
+            Ok(_) => {},
+            Err(e) => {
+                errs.push(format!("{} - {}", k, e));
             }
         }
     }
+    if errs.len() > 0 {
+        return Err(errs.join("\n"));
+    }
 
     Ok(())
+
 }
 
