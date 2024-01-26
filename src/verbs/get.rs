@@ -55,8 +55,9 @@ impl DownloadTask
         }
     }
 
-    async fn get_metadata(&mut self, pb: Option<&ProgressBar>) -> Result<DownloadTask, String>
+    async fn get_metadata(&mut self) -> Result<DownloadTask, String>
     {
+        let pb = self.bar.as_ref();
         pb.unwrap().inc(1);
         pb.unwrap().set_message(format!("{} [{}] - Getting metadata", self.id, self.postfix));
         let resp = self.client
@@ -71,7 +72,7 @@ impl DownloadTask
         let bytes = match resst {
             Ok(s) => s.bytes().await,
             Err(e) => {
-                return Err(format!("{} [{}] - Denied (this might be ok) {}", self.id, self.postfix, e.without_url()));
+                return Err(format!("{} [{}] - Denied (are you logged in? Does this exist?) {}", self.id, self.postfix, e.without_url()));
             }
         };
         let v= serde_json::from_slice::<serde_json::Value>(&bytes.unwrap()).unwrap();
@@ -83,8 +84,9 @@ impl DownloadTask
         Ok(self.clone())
     }
 
-    async fn dl(&mut self, pb: Option<&ProgressBar>) -> Result<DownloadTask, String>
+    async fn dl(&mut self) -> Result<DownloadTask, String>
     {
+        let pb = self.bar.as_ref();
         pb.unwrap().inc(1);
         pb.unwrap().set_message(format!("{} [{}] - Starting download ... ", self.id, self.postfix));
         let resp = self.client
@@ -119,9 +121,9 @@ impl DownloadTask
         let mut stream = resp.bytes_stream();
         pb.unwrap().set_length(sz);
         pb.unwrap().set_style(ProgressStyle::default_bar()
-            .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta})")
-            .unwrap()
-            .progress_chars("#>-"));
+                              .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {bytes}/{total_bytes} ({eta})")
+                              .unwrap()
+                              .progress_chars("#>-"));
         pb.unwrap().set_message(format!("{} [{}] - Downloading", self.id, self.postfix));
         while let Some(item) = stream.next().await {
             if let Ok(bytes) = item{
@@ -187,36 +189,47 @@ pub async fn download_all<'a>(flt: &api::Flotilla<'a>, ids: Vec<String>, public:
         task.bar = Some(pb);
     }
 
-//Get metadata for all collections
-stream::iter(tasks)
-    .for_each_concurrent(10, |mut task|
-                         {
-                             let pb = task.bar.clone().unwrap();
-                             async move {
-                                 match task.get_metadata(Some(&pb)).await
-                                 {
-                                     Ok(_) => {
-                                         match task.dl(Some(&pb)).await
-                                         {
-                                             Ok(_) => {
-                                                 let ok_msg = format!("{} Downloaded to {}", task.id, task.dl_dest);
-                                                 task.result = Some(Ok(ok_msg.clone()));
-                                                 pb.finish_with_message(ok_msg);
-                                             },
-                                             Err(e) => {
-                                                 task.result = Some(Err(e.clone()));
-                                                 pb.abandon_with_message(e.to_string());
+    let x = stream::iter(&mut tasks)
+        .for_each_concurrent(10, |task|
+                             {
+                                 let pb = task.bar.clone().unwrap();
+                                 async move {
+                                     match task.get_metadata().await
+                                     {
+                                         Ok(_) => {
+                                             match task.dl().await
+                                             {
+                                                 Ok(_) => {
+                                                     let ok_msg = format!("{} Downloaded to {}", task.id, task.dl_dest);
+                                                     task.result = Some(Ok(ok_msg.clone()));
+                                                     pb.finish_with_message(ok_msg);
+                                                 },
+                                                 Err(e) => {
+                                                     task.result = Some(Err(e.clone()));
+                                                     pb.abandon_with_message(e.to_string());
+                                                 }
                                              }
+                                         },
+                                         Err(e) => {
+                                             task.result = Some(Err(e.clone()));
+                                             pb.abandon_with_message(e.to_string());
                                          }
-                                     },
-                                     Err(e) => {
-                                         pb.abandon_with_message(e.to_string());
                                      }
-                                 }
-                             }}).await;
+                                 }});
+    x.await;
 
+    //TODO there's probably a better way to do this
+    let errstrings: Vec<String> = tasks
+        .iter()
+        .filter_map(|x| x.result.as_ref().and_then(|r| r.as_ref().err()))
+        .cloned()
+        .collect();
 
-    Ok(())
+    match errstrings.len()
+    {
+        0 => Ok(()),
+        _ => Err(errstrings.join("\n"))
+    }
 
 }
 

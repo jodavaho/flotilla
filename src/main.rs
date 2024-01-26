@@ -23,7 +23,7 @@ fn main()
         Setup(options) => setup::exec(options.username, options.password, options.endpoint),
         Login(options) => login::exec(options.username, options.password, options.endpoint),
         Logout(_) => logout::exec(),
-        Get(options) => get::exec(options.id, options.public),
+        Get(options) => get::exec(options.ids, options.public),
         List(options) => list::exec(options.what),
         Fetch(_) => fetch::exec(),
         Edit(options) => edit::exec(options.id, options.operation, options.yes),
