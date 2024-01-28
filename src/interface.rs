@@ -92,6 +92,10 @@ pub struct GetOptions
     /// Try the public API endpoint instead of the private one (this will not work for private ships or collections which you do not own)
     #[argp(switch, short='p')]
     pub public: Option<bool>,
+
+    /// Try both the public and private API endpoints, yielding two copies, potnetially
+    #[argp(switch, short='b')]
+    pub both: Option<bool>,
 }
 
 fn parse_list_what(s: &str) -> Result<String, String>

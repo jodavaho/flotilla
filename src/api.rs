@@ -121,15 +121,18 @@ pub fn login(config: &config::Config) -> Result<session::Session, String>
         {
             return Err(res.err().unwrap().to_string());
         };
-        let res = res.unwrap();
-        let txt = res.text().unwrap();
+        let res = res.map_err(|e| e.to_string())?;
+        let txt = res.text().map_err(|e| e.to_string())?;
 
-        let json: serde_json::Value = serde_json::from_str(&txt).unwrap();
+        let json: serde_json::Value = serde_json::from_str(&txt).map_err(|e| e.to_string())?;
         session.id_token = json["AuthenticationResult"]["IdToken"].to_string();
         session.user_id = config.username.clone();
         session.refresh_token = json["AuthenticationResult"]["RefreshToken"].to_string();
         session.expiration_unix =
-            json["AuthenticationResult"]["ExpiresIn"].as_i64().unwrap()+Utc::now().timestamp();
+            json["AuthenticationResult"]["ExpiresIn"]
+            .as_i64()
+            .unwrap_or(0)
+            +Utc::now().timestamp();
         session.save_to_default();
     }
     Ok(session)
@@ -174,9 +177,9 @@ impl<'a> Flotilla<'a>{
         {
             return Err(res.err().unwrap().to_string());
         };
-        let res = res.unwrap();
-        let txt = res.text().unwrap();
-        let data: UserData = serde_json::from_str(&txt).unwrap();
+        let res = res.map_err(|e| e.to_string())?;
+        let txt = res.text().map_err(|e| e.to_string())?;
+        let data: UserData = serde_json::from_str(&txt).map_err(|e| e.to_string())?;
 
         Ok(data)
     }
@@ -199,8 +202,8 @@ impl<'a> Flotilla<'a>{
         {
             return Err(res.err().unwrap().to_string());
         }
-        let res = res.unwrap();
-        let _txt = res.text().unwrap();
+        let res = res.map_err(|e| e.to_string())?;
+        let _txt = res.text().map_err(|e| e.to_string())?;
         Ok(())
 
     }
@@ -210,8 +213,8 @@ impl<'a> Flotilla<'a>{
     {
         return match get_id_type(id)
         {
-            IdType::Collection => self.set_collection( serde_json::from_value(json).unwrap()),
-            IdType::Ship => self.set_ship( serde_json::from_value(json).unwrap()),
+            IdType::Collection => self.set_collection( serde_json::from_value(json).map_err(|e| e.to_string())?),
+            IdType::Ship => self.set_ship( serde_json::from_value(json).map_err(|e| e.to_string())?),
         }
     }
 
@@ -233,8 +236,8 @@ impl<'a> Flotilla<'a>{
         {
             return Err(res.err().unwrap().to_string());
         }
-        let res = res.unwrap();
-        let _txt = res.text().unwrap();
+        let res = res.map_err(|e| e.to_string())?;
+        let _txt = res.text().map_err(|e| e.to_string())?;
         Ok(())
 
     }
@@ -253,9 +256,12 @@ impl<'a> Flotilla<'a>{
         {
             return Err(res.err().unwrap().to_string());
         };
-        let res = res.unwrap();
-        let txt = res.text().unwrap();
-        let data: Collection = serde_json::from_str(&txt).unwrap();
+        let res = res.map_err(|e| e.to_string())?;
+        let txt = res.text().map_err(|e| e.to_string())?;
+        let _txt_json: serde_json::Value  = serde_json::from_str(&txt).map_err(|e| e.to_string())?;
+        //eprintln!("{}", txt);
+        //eprintln!("{}", txt_json);
+        let data: Collection = serde_json::from_str(&txt).map_err(|e| e.to_string())?;
 
         Ok(data)
     }
@@ -274,9 +280,9 @@ impl<'a> Flotilla<'a>{
         {
             return Err(res.err().unwrap().to_string());
         };
-        let res = res.unwrap();
-        let txt = res.text().unwrap();
-        let data: Ship = serde_json::from_str(&txt).unwrap();
+        let res = res.map_err(|e| e.to_string())?;
+        let txt = res.text().map_err(|e| e.to_string())?;
+        let data: Ship = serde_json::from_str(&txt).map_err(|e| e.to_string())?;
 
         Ok(data)
     }
@@ -294,9 +300,9 @@ impl<'a> Flotilla<'a>{
         {
             return Err(res.err().unwrap().to_string());
         };
-        let res = res.unwrap();
-        let txt = res.text().unwrap();
-        let data: Collection = serde_json::from_str(&txt).unwrap();
+        let res = res.map_err(|e| e.to_string())?;
+        let txt = res.text().map_err(|e| e.to_string())?;
+        let data: Collection = serde_json::from_str(&txt).map_err(|e| e.to_string())?;
 
         Ok(data)
     }

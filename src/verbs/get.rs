@@ -8,17 +8,27 @@ use indicatif::MultiProgress;
 use tokio::io::AsyncWriteExt;
 use std::time::Duration;
 
-pub fn exec(ids: Vec<String>, public: Option<bool>) -> Result<(), String>
+pub enum DLEndpoint{
+    Public,
+    Private,
+    Both,
+}
+pub fn exec(ids: Vec<String>, both: Option<bool>, public: Option<bool>) -> Result<(), String>
 {
     let public = public.unwrap_or(false);
     let config = config::Config::new().load_all(None,None,None);
     let session = session::Session::new().load_all();
     let multi = MultiProgress::new();
     let flt = api::Flotilla::new(&config, &session);
+    let eptype = match (both, public) {
+        (Some(true), _) => DLEndpoint::Both,
+        (_, true) => DLEndpoint::Public,
+        _ => DLEndpoint::Private,
+    };
     tokio::runtime::Builder::new_multi_thread()
         .enable_all()
         .build()
-        .unwrap().block_on( download_all(&flt, ids, public, Some(multi)) )
+        .unwrap().block_on( download_all(&flt, ids, eptype, Some(multi)) )
 }
 
 #[derive(Debug, Clone)]
@@ -94,7 +104,7 @@ impl DownloadTask
             .header("Authorization", &self.token_value)
             .send().await;
         if resp.is_err() {
-            return Err(format!("{} - Library error {} ", self.id, resp.unwrap_err().to_string()));
+            return Err(format!("{} [{}] - Library error {} ", self.id, self.postfix, resp.unwrap_err().to_string()));
         }
         let resst = resp.unwrap().error_for_status();
         let resp = match resst {
@@ -143,34 +153,35 @@ impl DownloadTask
     }
 }
 
-pub async fn download_all<'a>(flt: &api::Flotilla<'a>, ids: Vec<String>, public: bool, multi: Option<MultiProgress>) -> Result<(), String>
+pub async fn download_all<'a>(flt: &api::Flotilla<'a>, ids: Vec<String>, eptype: DLEndpoint, multi: Option<MultiProgress>) -> Result<(), String>
 {
 
     let token_value = format!("Bearer {}",flt.session.id_token.replace("\"", ""));
     let client = Client::new();
 
-    let mut tasks = ids.iter().map(|x| {
-        match public{
-            true =>
-                DownloadTask::new(
-                    x.to_string(),
-                    flt.config.download_path.clone(),
-                    format!("{}/shipyard/collection/public/{}", flt.config.endpoint, x),
-                    format!("{}/shipyard/collection/download/{}", flt.config.endpoint, x),
-                    client.clone(),
-                    token_value.clone(),
-                    "public ".to_string(),
-                    ),
-            false =>
-                DownloadTask::new(
-                    x.to_string(),
-                    flt.config.download_path.clone(),
-                    format!("{}/shipyard/collection/{}", flt.config.endpoint, x),
-                    format!("{}/shipyard/collection/download/{}", flt.config.endpoint, x),
-                    client.clone(),
-                    token_value.clone(),
-                    "private".to_string(),
-                    ),
+    let mut tasks = ids.iter().flat_map(|x| {
+        let pubtask = DownloadTask::new(
+            x.to_string(),
+            flt.config.download_path.clone(),
+            format!("{}/shipyard/collection/public/{}", flt.config.endpoint, x),
+            format!("{}/shipyard/collection/download/{}", flt.config.endpoint, x),
+            client.clone(),
+            token_value.clone(),
+            "public_".to_string(),
+            );
+        let privtask = DownloadTask::new(
+            x.to_string(),
+            flt.config.download_path.clone(),
+            format!("{}/shipyard/collection/{}", flt.config.endpoint, x),
+            format!("{}/shipyard/collection/download/{}", flt.config.endpoint, x),
+            client.clone(),
+            token_value.clone(),
+            "private".to_string(),
+            );
+        match eptype{
+            DLEndpoint::Public => vec![pubtask],
+            DLEndpoint::Private => vec![privtask],
+            DLEndpoint::Both => vec![pubtask, privtask],
         }
     }).collect::<Vec<DownloadTask>>();
 
@@ -190,7 +201,7 @@ pub async fn download_all<'a>(flt: &api::Flotilla<'a>, ids: Vec<String>, public:
     }
 
     let x = stream::iter(&mut tasks)
-        .for_each_concurrent(10, |task|
+        .for_each_concurrent(2, |task|
                              {
                                  let pb = task.bar.clone().unwrap();
                                  async move {
@@ -224,6 +235,11 @@ pub async fn download_all<'a>(flt: &api::Flotilla<'a>, ids: Vec<String>, public:
         .filter_map(|x| x.result.as_ref().and_then(|r| r.as_ref().err()))
         .cloned()
         .collect();
+
+    let _num_ok = tasks
+        .iter()
+        .filter_map(|x| x.result.as_ref().and_then(|r| r.as_ref().ok()))
+        .count();
 
     match errstrings.len()
     {
